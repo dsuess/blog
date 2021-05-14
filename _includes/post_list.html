@@ -1,9 +1,16 @@
-<h3>
-    <a class="post-link" href="{{ post.url | relative_url }}">
+<div class="post-listing">
+<a class="post-link" href="{{ post.url | relative_url }}">
+    <h3>
     {{ post.title | escape }}
-    </a>
-</h3>
+    </h3>
+    {%- if post.subtitle  -%}
+    <h4>
+    {{ post.subtitle | escape }}
+    </h4>
+    {%- endif -%}
+</a>
 {%- if site.show_description and post.description  -%}
 <p class="post-meta-description">{{ post.description }}</p>
 {%- endif -%}
-<p class="post-meta">{{ post.date | date: date_format }}</p>
+<p class="post-meta">Posted on {{ post.date | date: date_format }}</p>
+</div>
