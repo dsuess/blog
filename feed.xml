@@ -1,1 +1,469 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.1.1">Jekyll</generator><link href="https://dsuess.github.io/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="https://dsuess.github.io/blog/" rel="alternate" type="text/html" /><updated>2021-05-14T05:56:24-05:00</updated><id>https://dsuess.github.io/blog/feed.xml</id><title type="html">fastpages</title><subtitle>An easy to use blogging platform with support for Jupyter Notebooks.</subtitle><entry><title type="html">Fastpages Notebook Blog Post</title><link href="https://dsuess.github.io/blog/jupyter/2020/02/20/test.html" rel="alternate" type="text/html" title="Fastpages Notebook Blog Post" /><published>2020-02-20T00:00:00-06:00</published><updated>2020-02-20T00:00:00-06:00</updated><id>https://dsuess.github.io/blog/jupyter/2020/02/20/test</id><author><name></name></author><category term="jupyter" /><summary type="html"></summary><media:thumbnail xmlns:media="http://search.yahoo.com/mrss/" url="https://dsuess.github.io/blog/images/chart-preview.png" /><media:content medium="image" url="https://dsuess.github.io/blog/images/chart-preview.png" xmlns:media="http://search.yahoo.com/mrss/" /></entry><entry><title type="html">An Example Markdown Post</title><link href="https://dsuess.github.io/blog/markdown/2020/01/14/test-markdown-post.html" rel="alternate" type="text/html" title="An Example Markdown Post" /><published>2020-01-14T00:00:00-06:00</published><updated>2020-01-14T00:00:00-06:00</updated><id>https://dsuess.github.io/blog/markdown/2020/01/14/test-markdown-post</id><author><name></name></author><category term="markdown" /><summary type="html">Example Markdown Post</summary></entry></feed>
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.1.1">Jekyll</generator><link href="https://dsuess.github.io/blog/feed.xml" rel="self" type="application/atom+xml" /><link href="https://dsuess.github.io/blog/" rel="alternate" type="text/html" /><updated>2021-05-14T06:34:55-05:00</updated><id>https://dsuess.github.io/blog/feed.xml</id><title type="html">Matmuls all the way down</title><subtitle>Daniel Suess' personal blog</subtitle><entry><title type="html">From Scratchː Neural Network Inference on FPGAs – Part 2</title><link href="https://dsuess.github.io/blog/2021-05-10-fpga-part-2/" rel="alternate" type="text/html" title="From Scratchː Neural Network Inference on FPGAs – Part 2" /><published>2021-05-10T00:00:00-05:00</published><updated>2021-05-10T00:00:00-05:00</updated><id>https://dsuess.github.io/blog/fpga-part-2</id><content type="html" xml:base="https://dsuess.github.io/blog/2021-05-10-fpga-part-2/">&lt;p&gt;Now that the last post covered how to build the &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1&quot;&gt;example&lt;/a&gt; for emulation and hardware deployment, we are now ready to go in a bit more detail.
+This post will go over this simple baseline implementation for a 2 layer fully connected network running inference on FPGAs.&lt;/p&gt;
+
+&lt;h2 id=&quot;contents&quot;&gt;Contents&lt;/h2&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;a href=&quot;/blog/2021-05-09-fpga-part-1/&quot;&gt;&lt;strong&gt;Part 1&lt;/strong&gt;: How to build FPGA applications on AWS&lt;/a&gt; &lt;br /&gt;
+&lt;a href=&quot;/blog/2021-05-10-fpga-part-2/&quot;&gt;&lt;strong&gt;Part 2&lt;/strong&gt;: A baseline implementation for fully connected networks (this post)&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;code-walkthrough&quot;&gt;Code walkthrough&lt;/h2&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/train.py&quot;&gt;model&lt;/a&gt; we’re trying to run is as simple as it gets.
+Two fully connected layers; the first one ReLu-activated and the second (and final) layer with a softmax activation.&lt;/p&gt;
+
+&lt;div class=&quot;language-python highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FCNN&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;__init__&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;input_size&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;num_classes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;):&lt;/span&gt;
+        &lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;layer1&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dense&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;input_size&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;layer2&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Dense&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;num_classes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;__call__&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Tensor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Tensor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;x&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;layer1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;relu6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;bp&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;layer2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;logsoftmax&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;This means we’ll need to implement the following three kernels:&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;matrix-matrix multiplication&lt;/li&gt;
+  &lt;li&gt;bias-addition + ReLu non-linearity&lt;/li&gt;
+  &lt;li&gt;bias-addition + softmax non-linearity&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The reason for separating the matrix-multiplication and bias-addition operations into two kernels is that the former is likely going to be the biggest performance bottleneck.
+Therefore, keeping them separated will make experimentation with different matrix-multiplication implementation easier later on.&lt;br /&gt;
+Also, fusing the bias-addition and non-linearity functions into a single kernel will likely be beneficial for performance.
+Both operations are relatively fast, so the additional overhead from launching a kernel will be more noticeable.
+Both operations also have a low computation-to-memory-transfer ratio, and hence, benefit from reducing the memory access by executing both bias-addition and non-linearity in one pass.&lt;/p&gt;
+
+&lt;p&gt;The structure of the model is also duplicated for the C++ implementation in the &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/f301d3053bbc0ab7baea4ea92b440add63734369/src/net.hpp&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;net.hpp&lt;/code&gt;&lt;/a&gt; file, which we will cover later.&lt;/p&gt;
+
+&lt;h2 id=&quot;kernel-implementations&quot;&gt;Kernel implementations&lt;/h2&gt;
+
+&lt;p&gt;The first and simplest kernel we’ll write is the bias + ReLu6 kernel.
+Thanks to the HLS using C++ and not including any optional, FPGA-specific code, the first &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/bias_relu6_kernel.cpp&quot;&gt;baseline implementation&lt;/a&gt; looks like standard C++ code&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;extern&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;C&quot;&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;bias_relu6_kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;activation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;bias&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;batch_size&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dim&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+   &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;batch_size&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+   &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dim&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+         &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ia&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dim&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+         &lt;span class=&quot;n&quot;&gt;activation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ia&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;relu6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;activation&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ia&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;bias&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]);&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+   &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The implementation for the bias + softmax &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/bias_softmax_kernel.cpp&quot;&gt;kernel&lt;/a&gt; is very similar.
+Note that the result is computed inplace using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;activation&lt;/code&gt; both as an input and an output.
+This is not possible for the matrix-multiplication kernel since the shape of either input and the output can be different.
+Hence, we need to allocate sufficient memory outside of the kernel and pass in a pointer using the additional &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;out&lt;/code&gt; argument.
+The naive implementation using three for-loops is certainly not optimal and will need to be revisited later:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;extern&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot;C&quot;&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;matmul_kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;rowsA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+   &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;rowsA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+   &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+      &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+         &lt;span class=&quot;c1&quot;&gt;// Nulling result here causes issues when running in hw-emu mode.&lt;/span&gt;
+         &lt;span class=&quot;c1&quot;&gt;// Looks like io isn't updated &quot;in time&quot;&lt;/span&gt;
+         &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;io&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsB&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+         &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+         &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ia&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsA&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;uint&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ib&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;colsB&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;k&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ia&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ib&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+         &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+      &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+   &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;The output array &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;out&lt;/code&gt; should be initialized to zero outside of the kernel and all arrays are assumed to store their elements in row-major order.&lt;/p&gt;
+
+&lt;h2 id=&quot;host-application&quot;&gt;Host application&lt;/h2&gt;
+
+&lt;p&gt;So far, we’ve implemented all the code that will “run” on the FPGA device.
+The rest, which makes up the majority of the code, is for the host-device (CPU) and needed for memory management as well as dispatching the kernels.&lt;/p&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/matrix.hpp#L37&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Matrix&lt;/code&gt; class&lt;/a&gt; abstracts away the memory management as well as the host-device memory transfers.
+One major constraint for using Vitis is that all memory copied to or from the FPGA device needs to be page-aligned on the host device, i.e. both the starting address and memory size have to be divisible by page size.
+For this, we use a &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/matrix.hpp#L27&quot;&gt;custom allocator&lt;/a&gt; with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;DEFAULT_ALIGNMENT&lt;/code&gt; being hard coded to the page size &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;4096&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;template&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;typename&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;aligned_alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;size_t&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;num&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;size_t&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;alignment&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DEFAULT_ALIGNMENT&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ptr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;nullptr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;posix_memalign&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ptr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;alignment&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;num&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;sizeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)))&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;bad_alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;reinterpret_cast&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ptr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The functions &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/matrix.hpp#L178&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;to_device&lt;/code&gt;&lt;/a&gt; and &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/matrix.hpp#L196&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;to_cpu&lt;/code&gt;&lt;/a&gt; handle memory transfer between the host and the device.
+We implement move-semantics for the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Matrix&lt;/code&gt; class by implementing special constructors and the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;=&lt;/code&gt;-operator to allow for copy-free return values from functions.&lt;br /&gt;
+Finally, the two helper functions at the bottom of &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/4811b23d4fd4300c53a2f7638d5b9deee93a051d/src/matrix.hpp#L210&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;matrix.hpp&lt;/code&gt;&lt;/a&gt; abstract the OpenCL kernel-dispatch overhead for us.
+For example, the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;apply_matmul&lt;/code&gt; function applies the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;matmul_kernel&lt;/code&gt; to two &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;Matrix&lt;/code&gt; instances:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;pair&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Event&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;apply_matmul&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Kernel&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;vector&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Event&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;wait_on&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;NULL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DeviceHandle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;handle&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;HANDLE&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;constant&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;rows&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;0.0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4096&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;to_device&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;handle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get_buffer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;());&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get_buffer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;());&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;rows&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixA&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;4&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;matrixB&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;setArg&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;5&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;get_buffer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;());&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;cl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Event&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;handle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;q&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;enqueueTask&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;kernel&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;wait_on&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;make_pair&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;move&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Since OpenCL provides an async API, we do not simply invoke the kernel, but we enqueue the task of running the kernel in a &lt;a href=&quot;https://livebook.manning.com/book/opencl-in-action/chapter-7/&quot;&gt;command queue&lt;/a&gt;.
+This task may depend on other previously enqueued tasks, which can be expressed using the (optional) &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;wait_on&lt;/code&gt; argument.
+A reference to the newly invoked task is returned as the second return value of type &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;cl::Event&lt;/code&gt;.
+Only after this task is processed does the return value &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;result&lt;/code&gt; contain the computed value.
+To see how this is used, take a look at the &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/f301d3053bbc0ab7baea4ea92b440add63734369/src/net.hpp#L40&quot;&gt;forward-pass&lt;/a&gt; of the network:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;  &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;operator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;input&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;vector&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Event&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;resize&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tie&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;apply_matmul&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;input&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weight1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MATMUL_KERNEL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The matrix-multiplication in the first layer is independent of any operation.
+Therefore, we do not pass the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;wait_on&lt;/code&gt; argument in this line.
+The event-result is then assigned to the first entry of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;events&lt;/code&gt; vector and duplicated in the following lines to make sure every entry of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;events&lt;/code&gt; is a valid &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;cl::Event&lt;/code&gt; instance:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;        &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;apply_bias&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;bias1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;BIAS_RELU6_KERNEL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;A pointer to this vector is then passed on to the bias-activation part of the first layer since it depends on the prior matrix-multiplication to finish.
+A similar effect can be achieved by only allocating a vector of size one at this point, but then we would have to resize the vector after each additional operation.
+The following lines then apply the second layer of the network accordingly.&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;        &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tie&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;apply_matmul&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weight2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;MATMUL_KERNEL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;apply_bias&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;bias2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;BIAS_SOFTMAX_KERNEL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;events&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;y&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;err&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Now we are ready to look at the high-level implementation in &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/f301d3053bbc0ab7baea4ea92b440add63734369/src/main.cpp&quot;&gt;main.cpp&lt;/a&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;const&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;argv&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[])&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;init_kernels&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;model&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;FCNN&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;weights/&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;input&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Matrix&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;from_npy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;weights/samples.npy&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;input&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;to_device&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;The first call to &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/f301d3053bbc0ab7baea4ea92b440add63734369/src/utils.hpp#L40&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;init_kernels&lt;/code&gt;&lt;/a&gt; loads the OpenCL kernels from a separate binary file and stores references to them in global variables.
+Next, we load the model weights from separate &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;.npy&lt;/code&gt; files, one for each tensor.
+Finally, we also load the input samples that we will feed into the model.
+These &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;.npy&lt;/code&gt; files are prepared by the &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/f301d3053bbc0ab7baea4ea92b440add63734369/train.py#L97&quot;&gt;train script&lt;/a&gt; and stored as float32 arrays.&lt;/p&gt;
+
+&lt;p&gt;Next, we run the model, wait for all OpenCL events to finish, and copy the result back from the device to the host:&lt;/p&gt;
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;model&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;input&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+    &lt;span class=&quot;n&quot;&gt;finish_cl_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;to_cpu&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;finish_cl_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;Finally, for each element in the batch, we compute the argmax of the confidence scores to get the final prediction and print it to stdout:&lt;/p&gt;
+
+&lt;div class=&quot;language-c++ highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    &lt;span class=&quot;c1&quot;&gt;// print argmax result&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;rows&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;kt&quot;&gt;float&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;minval&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;idx&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+        &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;++&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;auto&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;val&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;minval&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;val&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;idx&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;minval&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;val&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+        &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cout&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;idx&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;&quot; &quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;cout&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;std&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;::&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;endl&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In the next posts we will look at the performance characteristics of this baseline implementation and how to improve both latency as well as reduce the resource requirements.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;em&gt;Cover Image&lt;/em&gt; by &lt;a href=&quot;https://commons.wikimedia.org/wiki/File:Xilinx_FPGA_XCV400E-PQ240.jpg&quot;&gt;Pedant01&lt;/a&gt; CC BY-SA 4.0&lt;/p&gt;
+&lt;/blockquote&gt;</content><author><name></name></author><category term="fpga" /><category term="hardware" /><summary type="html">Now that the last post covered how to build the example for emulation and hardware deployment, we are now ready to go in a bit more detail. This post will go over this simple baseline implementation for a 2 layer fully connected network running inference on FPGAs.</summary></entry><entry><title type="html">From Scratchː Neural Network Inference on FPGAs – Part 1</title><link href="https://dsuess.github.io/blog/2021-05-09-fpga-part-1/" rel="alternate" type="text/html" title="From Scratchː Neural Network Inference on FPGAs – Part 1" /><published>2021-05-09T00:00:00-05:00</published><updated>2021-05-09T00:00:00-05:00</updated><id>https://dsuess.github.io/blog/fpga-part-1</id><content type="html" xml:base="https://dsuess.github.io/blog/2021-05-09-fpga-part-1/">&lt;p&gt;Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments:
+Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs.
+The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs.
+For an overview over the advantages and disadvantages of each hardware type see &lt;a href=&quot;https://blog.inten.to/hardware-for-deep-learning-current-state-and-trends-51c01ebbb6dc&quot;&gt;this series of posts&lt;/a&gt; or &lt;a href=&quot;https://towardsdatascience.com/deep-learning-hardware-know-your-options-9e95026b5d5e&quot;&gt;this article&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;In this series of posts we will go over how to run inference for simple neural networks on FPGA devices.
+As the title “from scratch” suggests, the main focus is on getting to know FPGA programming better and slightly lower its traditionally high barrier of entry.&lt;br /&gt;
+This first post will go over the basic development by means of a &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1&quot;&gt;simple example application&lt;/a&gt; running inference on a 2 layer fully connected network.
+By using AWS’s F1-instances and their provided AMI with all the necessary software, all you need to follow is an AWS account.
+With minor changes the example should also run on most Xilinx FPGAs.&lt;/p&gt;
+
+&lt;h2 id=&quot;contents&quot;&gt;Contents&lt;/h2&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;a href=&quot;/blog/2021-05-09-fpga-part-1/&quot;&gt;&lt;strong&gt;Part 1&lt;/strong&gt;: How to build FPGA applications on AWS (this post)&lt;/a&gt; &lt;br /&gt;
+&lt;a href=&quot;/blog/2021-05-10-fpga-part-2/&quot;&gt;&lt;strong&gt;Part 2&lt;/strong&gt;: A baseline implementation for fully connected networks&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;programming-fpgas&quot;&gt;Programming FPGAs&lt;/h2&gt;
+
+&lt;p&gt;One of the main challenges of using FPGAs is that their programming model is fundamentally different to most other “programming”:
+Instead of generating instructions that are run by a processing unit, programming an FPGA means programming the actual hardware.
+For this to make sense, we first need to understand what an FPGA is.&lt;br /&gt;
+Highly simplified, an FPGA consist of many programable logic blocks such as look-up tables (LUT), memory, and reconfigurable connections between those building blocks.
+Re-configuring the behavior of the logic blocks and the connections between them allows us to implement different digital circuits.
+So the final “program” can be thought of a schematic that is implemented by the FPGA.&lt;/p&gt;
+
+&lt;p&gt;Traditionally FPGAs are programmed using a &lt;a href=&quot;https://en.wikipedia.org/wiki/Hardware_description_language&quot;&gt;hardware description language&lt;/a&gt; such as Verilog or VHDL.
+These are quite different from popular programming languages, which is one major reason for the perceived high barrier of entry for FPGA programming.
+This barrier has been considerable lowered with the introduction of high-level synthesis (HLS) tools, which allow writing code for FPGAs in more mainstream languages such as C/C++.
+As it’s commonly the case, this increased abstraction and simplicity often comes at the cost of reduced efficiency of the resulting circuits.
+Therefore, for performance-critical implementations a good understanding of the underlying hardware layer is essential.&lt;/p&gt;
+
+&lt;p&gt;For our first implementation we will use Xilinx’ Vitis platform based on OpenCL:
+An OpenCL device such as an FPGA executes small programs called “kernels”.
+These kernels are managed and launched by the host device (CPU).
+By implementing these kernels using HLS, the implementation for FPGA looks remarkably close to what a similar implementation for CPUs would look like.
+The main difference is that the FPGA kernels are not simply instructions that are processed like on a CPU, but they are implemented as digital circuits on the device.
+So for example, if we want to run parts of the code in parallel, we can’t just run it in parallel on multiple cores; instead, we need to duplicate the physical circuit on the FPGA.&lt;/p&gt;
+
+&lt;p&gt;Note that Xilinx’ &lt;a href=&quot;https://github.com/Xilinx/Vitis-AI&quot;&gt;Vitis AI&lt;/a&gt; platform provides a ready-to-use runtime for common network architectures such as Resnets for image classification and single-stage object detectors such as SSD and Yolo.
+However, as of writing of this post, AWS F1 instances are &lt;a href=&quot;https://github.com/Xilinx/Vitis-AI/issues/2&quot;&gt;not supported&lt;/a&gt;.
+In the future, I’d like to see how close simple implementations of the necessary layers can get to such a reference implementation efficiency-wise.&lt;/p&gt;
+
+&lt;h2 id=&quot;setting-up-the-development-environment&quot;&gt;Setting up the development environment&lt;/h2&gt;
+
+&lt;p&gt;The code accompanying this post can be found on &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1&quot;&gt;GitHub&lt;/a&gt;.
+It this first technical part, we will go over how to run it.
+As the necessary software does not seem to be freely available, we will use the &lt;a href=&quot;https://aws.amazon.com/marketplace/pp/Amazon-Web-Services-FPGA-Developer-AMI/B06VVYBLZZ&quot;&gt;FPGA Developer AMI&lt;/a&gt; on AWS.
+You will need an AWS account with payments setup as free-tier machines are not powerful enough for this purpose.&lt;/p&gt;
+
+&lt;p&gt;The build scripts in this example are based on the &lt;a href=&quot;https://github.com/Xilinx/Vitis-Tutorials&quot;&gt;official Vitis tutorials&lt;/a&gt;.
+However, these do not work out-of-the-box in AWS’ FPGA environment and require two changes:&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;the &lt;a href=&quot;https://github.com/Xilinx/Vitis-Tutorials/blob/master/Hardware_Accelerators/Introduction/03-Algorithm_Acceleration/docs/module1_baseline/Makefile#L36&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;PLATFORM&lt;/code&gt;&lt;/a&gt; variable needs to be set to &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/master/CMakeLists.txt#L14&quot;&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;$AWS_PLATFORM&lt;/code&gt;&lt;/a&gt; – an environment variable that set by the FPGA AMI,&lt;/li&gt;
+  &lt;li&gt;the FPGA memory bank used needs to be &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/master/src/matrix.hpp#L22&quot;&gt;changed&lt;/a&gt; in hardware-emulation mode.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The last sentence already brings us to one important point when it comes to working with FPGAs:
+Synthesizing the program for an actual hardware device can take a long time, even multiple hours and even for simple designs.
+That’s the reason why we will make extensive use of two different types of emulation.&lt;/p&gt;
+
+&lt;p&gt;First, in software-emulation mode, the kernels are compiled to native code and run directly on the CPU.
+On one hand, this makes it very fast to compile and ideal during feature development to achieve a fast development cycle.
+On the other hand, as actual schematic-synthesis is not necessary for this step, certain errors will not show up in software emulation.&lt;br /&gt;
+Second, there is hardware-emulation mode that runs an actual synthesized schematic on a simulated device.
+As this simulation is quite detailed, hardware-emulation runs much slower than software emulation.
+It also adds additional compile time to the development cycle, but is still considerably faster than compiling for an actual FPGA.
+On the plus side, hardware-emulation allows not just for functionality testing, but also allows probing the performance characteristics and resources demands for running on a physical device.&lt;/p&gt;
+
+&lt;p&gt;As neither emulation mode requires an FPGA, most development work can (and should) be done on a beefy CPU-only machine saving a lot of money in the process.
+We will only require an FPGA instance for the last bit of testing.&lt;/p&gt;
+
+&lt;h3 id=&quot;setting-up-the-ec2-instance&quot;&gt;Setting up the EC2 instance&lt;/h3&gt;
+
+&lt;p&gt;As mentioned in the previous section, most of the development work does not require an FPGA instance and can be done on general purpose instance types.
+To follow this tutorial, you will need an S3 bucket (named &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;fpga-storage&lt;/code&gt; here) and an EC2 instance with&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;the AWS FPGA Developer AMI loaded,&lt;/li&gt;
+  &lt;li&gt;at least 16GB of RAM (e.g. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;m5.xlarge&lt;/code&gt; instance type or larger to speed up emulation),&lt;/li&gt;
+  &lt;li&gt;an IAM role with read/write access to the S3 bucket and the following permissions:
+    &lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;DescribeFpgaImageAttribute
+DescribeFpgaImages
+CopyFpgaImage
+CreateFpgaImage
+DeleteFpgaImage
+ModifyFpgaImageAttribute
+ResetFpgaImageAttribute
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;    &lt;/div&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;In the remainder of this section we provide step-by-step instructions how to launch the required instance.
+Experienced AWS users can skip ahead to &lt;a href=&quot;#setting-up-the-environment&quot;&gt;the next section&lt;/a&gt;.&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;Create a new S3 bucket from the &lt;a href=&quot;https://s3.console.aws.amazon.com/s3/home&quot;&gt;S3 management console&lt;/a&gt;.
+Set the name to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;fpga-storage&lt;/code&gt; and keep the default values for the remaining options.&lt;/li&gt;
+  &lt;li&gt;From the &lt;a href=&quot;https://console.aws.amazon.com/iam/home#/policies&quot;&gt;IAM Policy creation&lt;/a&gt; create a new policy.&lt;/li&gt;
+  &lt;li&gt;For service select “S3”; for actions select “ListBucket”, “GetObject”, “PutObject”, and “DeleteObject”, and for resources select “Any” for all fields except “bucket”, for which you set the bucket-name to “fpga-storage”:
+&lt;img src=&quot;../images/2021-02-18-fpga-part-1_c004d582d8d82215e71a8abdec2ef3db68e8680e62e13510fa3f5bb3a02a4e48.jpg&quot; alt=&quot;&quot; title=&quot;Policy settings for S3 service&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;Click “Add additional permissions” and add the following permissions (also listed above) for the “EC2” service:
+&lt;img src=&quot;../images/2021-02-18-fpga-part-1_81ce41d4c19b615135186907dbff321e873cb9b0dde0a02f6761102390f61861.jpg&quot; alt=&quot;&quot; title=&quot;Policy settings for EC2 service&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;Continue through the screens until you end up on the “Review policy” screen. Enter “FpgaDevPolicy” as the name and finalize the role creation.&lt;/li&gt;
+  &lt;li&gt;You can now use the &lt;a href=&quot;https://console.aws.amazon.com/iam/home#/roles&quot;&gt;IAM role creation&lt;/a&gt; to create a new role.&lt;/li&gt;
+  &lt;li&gt;Select “AWS Services” → “EC2” as the trusted entity from the next screen.&lt;/li&gt;
+  &lt;li&gt;Choose the newly created “FpgaDevPolicy” from the list and continue until you reach the “Review role” screen. Enter the name “FpgaDevRole” and finalize the role creation.&lt;/li&gt;
+  &lt;li&gt;From the &lt;a href=&quot;https://console.aws.amazon.com/ec2/v2/home#Instances:&quot;&gt;EC2 console&lt;/a&gt;, click “Launch instance”.&lt;/li&gt;
+  &lt;li&gt;In the AMI search bar, enter “FPGA” and select the AWS Marketplace from the menu on the left. Select the “FPGA Developer AMI” by AWS from the list.
+&lt;img src=&quot;../images/2021-02-18-fpga-part-1_e18315e8a60b70f628b0694d681b66cfaa90dabf2a27da953e128a3c4f432e19.jpg&quot; alt=&quot;&quot; title=&quot;Selecting the FPGA AMI&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;Continue to the instance selection step. Choose the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;m5.xlarge&lt;/code&gt; instance type and click the “Next: Configure instance details” button.&lt;/li&gt;
+  &lt;li&gt;Choose the created “FpgaDevRole” for the IAM role entry. Click “Add storage”.&lt;/li&gt;
+  &lt;li&gt;Delete the additional EBS volume and raise the size of the root partition to 200GB.&lt;/li&gt;
+  &lt;li&gt;Click “Review and Launch” and “Launch the instance”.&lt;/li&gt;
+  &lt;li&gt;If necessary, &lt;a href=&quot;https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html&quot;&gt;setup ssh authentication&lt;/a&gt; and ssh into the new instance using public IP displayed in AWS:&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;ssh &lt;span class=&quot;nt&quot;&gt;-i&lt;/span&gt; ~/.ssh/PATH_TO_PRIVATE_KEY centos@xxx.xxx.xxx.xxx
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;setting-up-the-environment&quot;&gt;Setting up the environment&lt;/h3&gt;
+
+&lt;p&gt;Now that we are connected to the EC2 instance with the FPGA developer tools, we need to install some additional requirements:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;yum &lt;span class=&quot;nb&quot;&gt;install &lt;/span&gt;cmake3 jq
+&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;git clone https://github.com/aws/aws-fpga ~/src/project_data/aws-fpga
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The second line clones a repo with some additional helper scripts from AWS’ official github repo.
+We mainly need it to setup the development environment on the machine by running&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;source&lt;/span&gt; ~/src/project_data/aws-fpga/vitis_setup.sh
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Note that the above command needs to be run &lt;strong&gt;every time&lt;/strong&gt; when logging into the machine as it modifies the shell environment.&lt;/p&gt;
+
+&lt;h2 id=&quot;running-the-examples&quot;&gt;Running the examples&lt;/h2&gt;
+
+&lt;p&gt;We are now ready to run the &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1&quot;&gt;examples&lt;/a&gt; on this machine.
+For this, we are going to follow the normal development cycle: software emulation, hardware emulation, and finally compiling for the hardware device.
+To follow the following examples, you’ll need to clone the example repo&lt;/p&gt;
+
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ git clone https://github.com/dsuess/nn-on-fpgas -b part-1-v1 --recursive &amp;amp;&amp;amp; cd nn-on-fpgas
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;software-emulation&quot;&gt;Software Emulation&lt;/h3&gt;
+
+&lt;p&gt;The fastest way to run the examples is using software emulation.
+This compiles the kernels to native code and circumvents the circuit-synthesis completely.
+In the build scripts, the compilation mode is controlled through the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TARGET&lt;/code&gt; variable, which has three possible values &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;sw_emu&lt;/code&gt;, &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;hw_emu&lt;/code&gt;, and &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;hw&lt;/code&gt;.
+To compile the example in software emulation, we can simply run&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;build_sw &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;build_sw &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; cmake3 &lt;span class=&quot;nt&quot;&gt;-DTARGET&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;sw_emu .. &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; make main kernels tests emconfig.json
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;In case this command raises an error, please make sure you followed the &lt;a href=&quot;#setting-up-the-environment&quot;&gt;setup instructions&lt;/a&gt; above.
+This builds all the necessary targets in the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;build_sw&lt;/code&gt; subdirectory:&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;main&lt;/code&gt; builds example program,&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;tests&lt;/code&gt; builds test suite for the kernels, and&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;kernels&lt;/code&gt; builds the kernel binary &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;xclbin/kernels.xclbin&lt;/code&gt;, and&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;emconfig.json&lt;/code&gt; contains information on the target hardware platform.
+The kernels (i.e. the basic mathetmatical operations that should run on the FPGA) are loaded by the application at runtime.
+We will look at these in more detail in the next part of this series.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;We can now run the test or the example application:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ XCL_EMULATION_MODE&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;sw_emu ./tests
+&lt;span class=&quot;nv&quot;&gt;$ XCL_EMULATION_MODE&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;sw_emu ./main
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The latter should print &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;0 1 2 2 4 5 6 7 8 9&lt;/code&gt; in the last line.
+These are the class-predictions of the model when running on images for the classes 0 to 9.
+The accuracy of the model is around 94% which is the reason we see a mistake for the label 3.&lt;/p&gt;
+
+&lt;h3 id=&quot;hardware-emulation&quot;&gt;Hardware emulation&lt;/h3&gt;
+
+&lt;p&gt;Building the kernels for hardware emulation simply requires changing the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;TARGRT&lt;/code&gt; variable:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;build_hw &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;build_hw &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; cmake3 &lt;span class=&quot;nt&quot;&gt;-DTARGET&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;hw_emu .. &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; make kernels tests emconfig.json
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This command should be run from the root directory of the git repo.
+Note that compilation takes much longer compared to software emulation mode.
+The same is true for running the examples, which is why we only run the tests in hardware emulation:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;XCL_EMULATION_MODE&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;hw_emu ./tests
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Besides the binaries, hardware emulation also produces detailed reports on resource utilization and suggested changes in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;_x/reports&lt;/code&gt;.
+We will come back to these diagnostics in a later part of this series.&lt;/p&gt;
+
+&lt;h3 id=&quot;running-on-fpga&quot;&gt;Running on FPGA&lt;/h3&gt;
+
+&lt;p&gt;Finally, we are now in a position to run the example on an actual FPGA hardware device:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;build &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;build &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; cmake3 &lt;span class=&quot;nt&quot;&gt;-DTARGET&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;hw .. &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; make kernels
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This step will only build the kernel binary in &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;xclbin/kernels.xclbin&lt;/code&gt; and may take over one hour to finish.
+If you don’t want to wait that long, we provide a finished version of the binary as a &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/releases/tag/part-1-v1&quot;&gt;Github Release&lt;/a&gt;.&lt;br /&gt;
+On a standard Xilinx system we could directly run the kernels from the xclbin file.
+However, AWS requires on additional step, namely converting the xclbin to an Amazon FGPA image (AFI).
+The build steps are outlined in the &lt;a href=&quot;https://github.com/aws/aws-fpga/blob/master/Vitis/README.md#build-the-host-application-and-xilinx-fpga-binary&quot;&gt;offical AWS FPGA repo&lt;/a&gt;.&lt;br /&gt;
+First, we need to set the default region to be used for the following commands to a region that supports FPGA instances (here &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;us-east-1&lt;/code&gt;)&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;aws configure &lt;span class=&quot;nb&quot;&gt;set &lt;/span&gt;default.region us-east-1
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Now we can create the AFI image and save it to the S3 bucket &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;fpga-storage&lt;/code&gt;, which we created during the initial environment setup:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ $VITIS_DIR&lt;/span&gt;/tools/create_vitis_afi.sh &lt;span class=&quot;nt&quot;&gt;-xclbin&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;xclbin/kernels.xclbin &lt;span class=&quot;se&quot;&gt;\&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;-o&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;xclbin/kernels &lt;span class=&quot;se&quot;&gt;\&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;-s3_bucket&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;fpga-storage &lt;span class=&quot;nt&quot;&gt;-s3_dcp_key&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;kernels &lt;span class=&quot;nt&quot;&gt;-s3_logs_key&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;logs
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;This will create a xclbin file &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;xclbin/kernels.awsxclbin&lt;/code&gt;, which should be loaded by the runtime instead of the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;xclbin/kernels.xclbin&lt;/code&gt; when running on F1 instances.
+In our standard runtime, this is &lt;a href=&quot;https://github.com/dsuess/nn-on-fpgas/blob/7d900e9370bbe4583e10114abd10585c8a043e37/src/utils.hpp#L9&quot;&gt;automatically done&lt;/a&gt; based on compile time flags.
+We copy this file to the S3 bucket for later use.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;aws s3 &lt;span class=&quot;nb&quot;&gt;cp &lt;/span&gt;xclbin/kernels.awsxclbin s3://fpga-storage/
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Additionally, there’s should be a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;*_afi_id.txt&lt;/code&gt; file created that contains the AFI ID.
+Using the AFI ID, we can check the status of the conversion processes running in the background:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;export &lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;AFI_ID&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;$(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;cat&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;_afi_id.txt | jq &lt;span class=&quot;nt&quot;&gt;-r&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;.FpgaImageId&quot;&lt;/span&gt;&lt;span class=&quot;si&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;aws ec2 describe-fpga-images &lt;span class=&quot;nt&quot;&gt;--fpga-image-ids&lt;/span&gt; &lt;span class=&quot;nv&quot;&gt;$AFI_ID&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Note that when running the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;create_vitis_afi.sh&lt;/code&gt; script multiple times, multiple files that fit the glob-pattern of the first command will be in the directory.
+Either choose the correct one by hand or delete all of them and re-run the script.&lt;br /&gt;
+Once the state code outputted by the describe-fpga-images command changes from “pending” to “available”, we are ready to finally run the example on an FPGA hardware device.
+For this, follow the &lt;a href=&quot;#setting-up-the-ec2-instance&quot;&gt;original setup steps&lt;/a&gt;, but choose an F1-instance type.
+After cloning the example repo, we need to build everything &lt;strong&gt;except&lt;/strong&gt; the kernels&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;build &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;build &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; cmake3 &lt;span class=&quot;nt&quot;&gt;-DTARGET&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;hw .. &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; make emconfig.json main tests
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We can simply copy the AFI kernel binary from S3&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;xclbin &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; aws s3 &lt;span class=&quot;nb&quot;&gt;cp &lt;/span&gt;s3://fpga-storage/kernels.awsxclbin xclbin/
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And run both the tests and the example application on the FPGA:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;./tests
+&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;./main
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h2&gt;
+
+&lt;p&gt;This finished the first post in the “From Scratch: Neural Network Inference on FPGAs” series, which covered the basics in how to develop applications for FPGAs.
+In the &lt;a href=&quot;/blog/2021-05-10-fpga-part-2/&quot;&gt;next post&lt;/a&gt; we will look at the implementation in a bit more detail.&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;em&gt;Cover Image&lt;/em&gt; by &lt;a href=&quot;https://commons.wikimedia.org/wiki/File:Xilinx_FPGA_XCV400E-PQ240.jpg&quot;&gt;Pedant01&lt;/a&gt; CC BY-SA 4.0&lt;/p&gt;
+&lt;/blockquote&gt;</content><author><name></name></author><category term="fpga" /><category term="hardware" /><summary type="html">Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments: Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs. The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs. For an overview over the advantages and disadvantages of each hardware type see this series of posts or this article.</summary></entry></feed>

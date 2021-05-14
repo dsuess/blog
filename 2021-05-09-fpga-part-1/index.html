@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary_large_image" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>From Scratchː Neural Network Inference on FPGAs – Part 1 | Matmuls all the way down</title>
+<meta name="generator" content="Jekyll v4.1.1" />
+<meta property="og:title" content="From Scratchː Neural Network Inference on FPGAs – Part 1" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments: Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs. The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs. For an overview over the advantages and disadvantages of each hardware type see this series of posts or this article." />
+<meta property="og:description" content="Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments: Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs. The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs. For an overview over the advantages and disadvantages of each hardware type see this series of posts or this article." />
+<link rel="canonical" href="https://dsuess.github.io/blog/2021-05-09-fpga-part-1/" />
+<meta property="og:url" content="https://dsuess.github.io/blog/2021-05-09-fpga-part-1/" />
+<meta property="og:site_name" content="Matmuls all the way down" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2021-05-09T00:00:00-05:00" />
+<script type="application/ld+json">
+{"url":"https://dsuess.github.io/blog/2021-05-09-fpga-part-1/","@type":"BlogPosting","headline":"From Scratchː Neural Network Inference on FPGAs – Part 1","dateModified":"2021-05-09T00:00:00-05:00","datePublished":"2021-05-09T00:00:00-05:00","mainEntityOfPage":{"@type":"WebPage","@id":"https://dsuess.github.io/blog/2021-05-09-fpga-part-1/"},"description":"Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments: Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs. The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs. For an overview over the advantages and disadvantages of each hardware type see this series of posts or this article.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://dsuess.github.io/blog/feed.xml" title="Matmuls all the way down" /><link rel="shortcut icon" type="image/x-icon" href="/blog/assets/img/favicon.ico"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Primer/15.2.0/primer.css" integrity="sha512-xTz2ys4coGAOz8vuV1NcQBkgVmKhsSEtjbqyMJbBHRplFuvKIUo6xhLHpAyPt9mfR6twHJgn9OgVLuqOvjeBhg==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css" integrity="sha512-1PKOgIY59xJ8Co8+NE6FZ+LOAZKjy+KY8iq0G4B3CyeY6wYHN3yt9PW0XpSriVlkMXe40PTKnXrLnZ9+fkDaog==" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/katex.min.css" integrity="sha512-h7nl+xz8wgDlNM4NqKEM4F1NkIRS17M9+uJwIGwuo8vGqIl4BhuCKdxjWEINm+xyrUjNCnK5dCrhM0sj+wTIXw==" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/katex.min.js" integrity="sha512-/CMIhXiDA3m2c9kzRyd97MTb3MC6OVnx4TElQ7fkkoRghwDf6gi41gaT1PwF270W6+J60uTmwgeRpNpJdRV6sg==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/contrib/auto-render.min.js" integrity="sha512-Do7uJAaHZm5OLrIv/yN4w0iG1dbu01kzdMNnFfu/mAqgUk6Nniv2JYHcwH+cNwjqgLcqcuBBk+JRvprLVI8azg==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha512-0doc9hKxR3PYwso42RD1p5ySZpzzuDiOwMrdCEh2WdJZCjcmFKc/wEnL+z8fBQrnHoiNWbo+3fiGkOYXBdQp4A==" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Matmuls all the way down</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/blog/_pages/about/">About</a><a class="page-link" href="/blog/search/">Search</a><a class="page-link" href="/blog/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">From Scratchː Neural Network Inference on FPGAs – Part 1</h1><h2 class="post-subtitle p-name">How to build FPGA applications on AWS</h2><p class="post-meta post-meta-title">Posted on
+      <time class="dt-published" datetime="2021-05-09T00:00:00-05:00" itemprop="datePublished">
+        May 9, 2021
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      12 min read
+    
+</span></p>
+
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>Deploying your deep learning models directly to edge devices comes with many advantages compared to traditional cloud deployments:
+Eliminating communication can reduce latency and reliance on the network connection; since the data never leaves the device, edge-inference helps maintaining user privacy; and since the amount of cloud resources is drastically reduced, edge-inference can also reduce ongoing costs.
+The proliferation of ML running on edge devices both drives and is driven by the development of specialized hardware accelerators such as GPUs, ASICs, or FPGAs.
+For an overview over the advantages and disadvantages of each hardware type see <a href="https://blog.inten.to/hardware-for-deep-learning-current-state-and-trends-51c01ebbb6dc">this series of posts</a> or <a href="https://towardsdatascience.com/deep-learning-hardware-know-your-options-9e95026b5d5e">this article</a>.</p>
+
+<p>In this series of posts we will go over how to run inference for simple neural networks on FPGA devices.
+As the title “from scratch” suggests, the main focus is on getting to know FPGA programming better and slightly lower its traditionally high barrier of entry.<br />
+This first post will go over the basic development by means of a <a href="https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1">simple example application</a> running inference on a 2 layer fully connected network.
+By using AWS’s F1-instances and their provided AMI with all the necessary software, all you need to follow is an AWS account.
+With minor changes the example should also run on most Xilinx FPGAs.</p>
+
+<h2 id="contents">Contents</h2>
+
+<blockquote>
+  <p><a href="/blog/2021-05-09-fpga-part-1/"><strong>Part 1</strong>: How to build FPGA applications on AWS (this post)</a> <br />
+<a href="/blog/2021-05-10-fpga-part-2/"><strong>Part 2</strong>: A baseline implementation for fully connected networks</a></p>
+</blockquote>
+
+<h2 id="programming-fpgas">Programming FPGAs</h2>
+
+<p>One of the main challenges of using FPGAs is that their programming model is fundamentally different to most other “programming”:
+Instead of generating instructions that are run by a processing unit, programming an FPGA means programming the actual hardware.
+For this to make sense, we first need to understand what an FPGA is.<br />
+Highly simplified, an FPGA consist of many programable logic blocks such as look-up tables (LUT), memory, and reconfigurable connections between those building blocks.
+Re-configuring the behavior of the logic blocks and the connections between them allows us to implement different digital circuits.
+So the final “program” can be thought of a schematic that is implemented by the FPGA.</p>
+
+<p>Traditionally FPGAs are programmed using a <a href="https://en.wikipedia.org/wiki/Hardware_description_language">hardware description language</a> such as Verilog or VHDL.
+These are quite different from popular programming languages, which is one major reason for the perceived high barrier of entry for FPGA programming.
+This barrier has been considerable lowered with the introduction of high-level synthesis (HLS) tools, which allow writing code for FPGAs in more mainstream languages such as C/C++.
+As it’s commonly the case, this increased abstraction and simplicity often comes at the cost of reduced efficiency of the resulting circuits.
+Therefore, for performance-critical implementations a good understanding of the underlying hardware layer is essential.</p>
+
+<p>For our first implementation we will use Xilinx’ Vitis platform based on OpenCL:
+An OpenCL device such as an FPGA executes small programs called “kernels”.
+These kernels are managed and launched by the host device (CPU).
+By implementing these kernels using HLS, the implementation for FPGA looks remarkably close to what a similar implementation for CPUs would look like.
+The main difference is that the FPGA kernels are not simply instructions that are processed like on a CPU, but they are implemented as digital circuits on the device.
+So for example, if we want to run parts of the code in parallel, we can’t just run it in parallel on multiple cores; instead, we need to duplicate the physical circuit on the FPGA.</p>
+
+<p>Note that Xilinx’ <a href="https://github.com/Xilinx/Vitis-AI">Vitis AI</a> platform provides a ready-to-use runtime for common network architectures such as Resnets for image classification and single-stage object detectors such as SSD and Yolo.
+However, as of writing of this post, AWS F1 instances are <a href="https://github.com/Xilinx/Vitis-AI/issues/2">not supported</a>.
+In the future, I’d like to see how close simple implementations of the necessary layers can get to such a reference implementation efficiency-wise.</p>
+
+<h2 id="setting-up-the-development-environment">Setting up the development environment</h2>
+
+<p>The code accompanying this post can be found on <a href="https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1">GitHub</a>.
+It this first technical part, we will go over how to run it.
+As the necessary software does not seem to be freely available, we will use the <a href="https://aws.amazon.com/marketplace/pp/Amazon-Web-Services-FPGA-Developer-AMI/B06VVYBLZZ">FPGA Developer AMI</a> on AWS.
+You will need an AWS account with payments setup as free-tier machines are not powerful enough for this purpose.</p>
+
+<p>The build scripts in this example are based on the <a href="https://github.com/Xilinx/Vitis-Tutorials">official Vitis tutorials</a>.
+However, these do not work out-of-the-box in AWS’ FPGA environment and require two changes:</p>
+<ul>
+  <li>the <a href="https://github.com/Xilinx/Vitis-Tutorials/blob/master/Hardware_Accelerators/Introduction/03-Algorithm_Acceleration/docs/module1_baseline/Makefile#L36"><code class="language-plaintext highlighter-rouge">PLATFORM</code></a> variable needs to be set to <a href="https://github.com/dsuess/nn-on-fpgas/blob/master/CMakeLists.txt#L14"><code class="language-plaintext highlighter-rouge">$AWS_PLATFORM</code></a> – an environment variable that set by the FPGA AMI,</li>
+  <li>the FPGA memory bank used needs to be <a href="https://github.com/dsuess/nn-on-fpgas/blob/master/src/matrix.hpp#L22">changed</a> in hardware-emulation mode.</li>
+</ul>
+
+<p>The last sentence already brings us to one important point when it comes to working with FPGAs:
+Synthesizing the program for an actual hardware device can take a long time, even multiple hours and even for simple designs.
+That’s the reason why we will make extensive use of two different types of emulation.</p>
+
+<p>First, in software-emulation mode, the kernels are compiled to native code and run directly on the CPU.
+On one hand, this makes it very fast to compile and ideal during feature development to achieve a fast development cycle.
+On the other hand, as actual schematic-synthesis is not necessary for this step, certain errors will not show up in software emulation.<br />
+Second, there is hardware-emulation mode that runs an actual synthesized schematic on a simulated device.
+As this simulation is quite detailed, hardware-emulation runs much slower than software emulation.
+It also adds additional compile time to the development cycle, but is still considerably faster than compiling for an actual FPGA.
+On the plus side, hardware-emulation allows not just for functionality testing, but also allows probing the performance characteristics and resources demands for running on a physical device.</p>
+
+<p>As neither emulation mode requires an FPGA, most development work can (and should) be done on a beefy CPU-only machine saving a lot of money in the process.
+We will only require an FPGA instance for the last bit of testing.</p>
+
+<h3 id="setting-up-the-ec2-instance">Setting up the EC2 instance</h3>
+
+<p>As mentioned in the previous section, most of the development work does not require an FPGA instance and can be done on general purpose instance types.
+To follow this tutorial, you will need an S3 bucket (named <code class="language-plaintext highlighter-rouge">fpga-storage</code> here) and an EC2 instance with</p>
+<ul>
+  <li>the AWS FPGA Developer AMI loaded,</li>
+  <li>at least 16GB of RAM (e.g. <code class="language-plaintext highlighter-rouge">m5.xlarge</code> instance type or larger to speed up emulation),</li>
+  <li>an IAM role with read/write access to the S3 bucket and the following permissions:
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>DescribeFpgaImageAttribute
+DescribeFpgaImages
+CopyFpgaImage
+CreateFpgaImage
+DeleteFpgaImage
+ModifyFpgaImageAttribute
+ResetFpgaImageAttribute
+</code></pre></div>    </div>
+  </li>
+</ul>
+
+<p>In the remainder of this section we provide step-by-step instructions how to launch the required instance.
+Experienced AWS users can skip ahead to <a href="#setting-up-the-environment">the next section</a>.</p>
+
+<ol>
+  <li>Create a new S3 bucket from the <a href="https://s3.console.aws.amazon.com/s3/home">S3 management console</a>.
+Set the name to <code class="language-plaintext highlighter-rouge">fpga-storage</code> and keep the default values for the remaining options.</li>
+  <li>From the <a href="https://console.aws.amazon.com/iam/home#/policies">IAM Policy creation</a> create a new policy.</li>
+  <li>For service select “S3”; for actions select “ListBucket”, “GetObject”, “PutObject”, and “DeleteObject”, and for resources select “Any” for all fields except “bucket”, for which you set the bucket-name to “fpga-storage”:
+<img src="../images/2021-02-18-fpga-part-1_c004d582d8d82215e71a8abdec2ef3db68e8680e62e13510fa3f5bb3a02a4e48.jpg" alt="" title="Policy settings for S3 service" /></li>
+  <li>Click “Add additional permissions” and add the following permissions (also listed above) for the “EC2” service:
+<img src="../images/2021-02-18-fpga-part-1_81ce41d4c19b615135186907dbff321e873cb9b0dde0a02f6761102390f61861.jpg" alt="" title="Policy settings for EC2 service" /></li>
+  <li>Continue through the screens until you end up on the “Review policy” screen. Enter “FpgaDevPolicy” as the name and finalize the role creation.</li>
+  <li>You can now use the <a href="https://console.aws.amazon.com/iam/home#/roles">IAM role creation</a> to create a new role.</li>
+  <li>Select “AWS Services” → “EC2” as the trusted entity from the next screen.</li>
+  <li>Choose the newly created “FpgaDevPolicy” from the list and continue until you reach the “Review role” screen. Enter the name “FpgaDevRole” and finalize the role creation.</li>
+  <li>From the <a href="https://console.aws.amazon.com/ec2/v2/home#Instances:">EC2 console</a>, click “Launch instance”.</li>
+  <li>In the AMI search bar, enter “FPGA” and select the AWS Marketplace from the menu on the left. Select the “FPGA Developer AMI” by AWS from the list.
+<img src="../images/2021-02-18-fpga-part-1_e18315e8a60b70f628b0694d681b66cfaa90dabf2a27da953e128a3c4f432e19.jpg" alt="" title="Selecting the FPGA AMI" /></li>
+  <li>Continue to the instance selection step. Choose the <code class="language-plaintext highlighter-rouge">m5.xlarge</code> instance type and click the “Next: Configure instance details” button.</li>
+  <li>Choose the created “FpgaDevRole” for the IAM role entry. Click “Add storage”.</li>
+  <li>Delete the additional EBS volume and raise the size of the root partition to 200GB.</li>
+  <li>Click “Review and Launch” and “Launch the instance”.</li>
+  <li>If necessary, <a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html">setup ssh authentication</a> and ssh into the new instance using public IP displayed in AWS:</li>
+</ol>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>ssh <span class="nt">-i</span> ~/.ssh/PATH_TO_PRIVATE_KEY centos@xxx.xxx.xxx.xxx
+</code></pre></div></div>
+
+<h3 id="setting-up-the-environment">Setting up the environment</h3>
+
+<p>Now that we are connected to the EC2 instance with the FPGA developer tools, we need to install some additional requirements:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">sudo </span>yum <span class="nb">install </span>cmake3 jq
+<span class="nv">$ </span>git clone https://github.com/aws/aws-fpga ~/src/project_data/aws-fpga
+</code></pre></div></div>
+
+<p>The second line clones a repo with some additional helper scripts from AWS’ official github repo.
+We mainly need it to setup the development environment on the machine by running</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">source</span> ~/src/project_data/aws-fpga/vitis_setup.sh
+</code></pre></div></div>
+
+<p>Note that the above command needs to be run <strong>every time</strong> when logging into the machine as it modifies the shell environment.</p>
+
+<h2 id="running-the-examples">Running the examples</h2>
+
+<p>We are now ready to run the <a href="https://github.com/dsuess/nn-on-fpgas/tree/part-1-v1">examples</a> on this machine.
+For this, we are going to follow the normal development cycle: software emulation, hardware emulation, and finally compiling for the hardware device.
+To follow the following examples, you’ll need to clone the example repo</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ git clone https://github.com/dsuess/nn-on-fpgas -b part-1-v1 --recursive &amp;&amp; cd nn-on-fpgas
+</code></pre></div></div>
+
+<h3 id="software-emulation">Software Emulation</h3>
+
+<p>The fastest way to run the examples is using software emulation.
+This compiles the kernels to native code and circumvents the circuit-synthesis completely.
+In the build scripts, the compilation mode is controlled through the <code class="language-plaintext highlighter-rouge">TARGET</code> variable, which has three possible values <code class="language-plaintext highlighter-rouge">sw_emu</code>, <code class="language-plaintext highlighter-rouge">hw_emu</code>, and <code class="language-plaintext highlighter-rouge">hw</code>.
+To compile the example in software emulation, we can simply run</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir </span>build_sw <span class="o">&amp;&amp;</span> <span class="nb">cd </span>build_sw <span class="o">&amp;&amp;</span> cmake3 <span class="nt">-DTARGET</span><span class="o">=</span>sw_emu .. <span class="o">&amp;&amp;</span> make main kernels tests emconfig.json
+</code></pre></div></div>
+
+<p>In case this command raises an error, please make sure you followed the <a href="#setting-up-the-environment">setup instructions</a> above.
+This builds all the necessary targets in the <code class="language-plaintext highlighter-rouge">build_sw</code> subdirectory:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">main</code> builds example program,</li>
+  <li><code class="language-plaintext highlighter-rouge">tests</code> builds test suite for the kernels, and</li>
+  <li><code class="language-plaintext highlighter-rouge">kernels</code> builds the kernel binary <code class="language-plaintext highlighter-rouge">xclbin/kernels.xclbin</code>, and</li>
+  <li><code class="language-plaintext highlighter-rouge">emconfig.json</code> contains information on the target hardware platform.
+The kernels (i.e. the basic mathetmatical operations that should run on the FPGA) are loaded by the application at runtime.
+We will look at these in more detail in the next part of this series.</li>
+</ul>
+
+<p>We can now run the test or the example application:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ XCL_EMULATION_MODE</span><span class="o">=</span>sw_emu ./tests
+<span class="nv">$ XCL_EMULATION_MODE</span><span class="o">=</span>sw_emu ./main
+</code></pre></div></div>
+
+<p>The latter should print <code class="language-plaintext highlighter-rouge">0 1 2 2 4 5 6 7 8 9</code> in the last line.
+These are the class-predictions of the model when running on images for the classes 0 to 9.
+The accuracy of the model is around 94% which is the reason we see a mistake for the label 3.</p>
+
+<h3 id="hardware-emulation">Hardware emulation</h3>
+
+<p>Building the kernels for hardware emulation simply requires changing the <code class="language-plaintext highlighter-rouge">TARGRT</code> variable:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir </span>build_hw <span class="o">&amp;&amp;</span> <span class="nb">cd </span>build_hw <span class="o">&amp;&amp;</span> cmake3 <span class="nt">-DTARGET</span><span class="o">=</span>hw_emu .. <span class="o">&amp;&amp;</span> make kernels tests emconfig.json
+</code></pre></div></div>
+
+<p>This command should be run from the root directory of the git repo.
+Note that compilation takes much longer compared to software emulation mode.
+The same is true for running the examples, which is why we only run the tests in hardware emulation:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">XCL_EMULATION_MODE</span><span class="o">=</span>hw_emu ./tests
+</code></pre></div></div>
+
+<p>Besides the binaries, hardware emulation also produces detailed reports on resource utilization and suggested changes in <code class="language-plaintext highlighter-rouge">_x/reports</code>.
+We will come back to these diagnostics in a later part of this series.</p>
+
+<h3 id="running-on-fpga">Running on FPGA</h3>
+
+<p>Finally, we are now in a position to run the example on an actual FPGA hardware device:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir </span>build <span class="o">&amp;&amp;</span> <span class="nb">cd </span>build <span class="o">&amp;&amp;</span> cmake3 <span class="nt">-DTARGET</span><span class="o">=</span>hw .. <span class="o">&amp;&amp;</span> make kernels
+</code></pre></div></div>
+
+<p>This step will only build the kernel binary in <code class="language-plaintext highlighter-rouge">xclbin/kernels.xclbin</code> and may take over one hour to finish.
+If you don’t want to wait that long, we provide a finished version of the binary as a <a href="https://github.com/dsuess/nn-on-fpgas/releases/tag/part-1-v1">Github Release</a>.<br />
+On a standard Xilinx system we could directly run the kernels from the xclbin file.
+However, AWS requires on additional step, namely converting the xclbin to an Amazon FGPA image (AFI).
+The build steps are outlined in the <a href="https://github.com/aws/aws-fpga/blob/master/Vitis/README.md#build-the-host-application-and-xilinx-fpga-binary">offical AWS FPGA repo</a>.<br />
+First, we need to set the default region to be used for the following commands to a region that supports FPGA instances (here <code class="language-plaintext highlighter-rouge">us-east-1</code>)</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>aws configure <span class="nb">set </span>default.region us-east-1
+</code></pre></div></div>
+
+<p>Now we can create the AFI image and save it to the S3 bucket <code class="language-plaintext highlighter-rouge">fpga-storage</code>, which we created during the initial environment setup:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ $VITIS_DIR</span>/tools/create_vitis_afi.sh <span class="nt">-xclbin</span><span class="o">=</span>xclbin/kernels.xclbin <span class="se">\</span>
+		<span class="nt">-o</span><span class="o">=</span>xclbin/kernels <span class="se">\</span>
+		<span class="nt">-s3_bucket</span><span class="o">=</span>fpga-storage <span class="nt">-s3_dcp_key</span><span class="o">=</span>kernels <span class="nt">-s3_logs_key</span><span class="o">=</span>logs
+</code></pre></div></div>
+
+<p>This will create a xclbin file <code class="language-plaintext highlighter-rouge">xclbin/kernels.awsxclbin</code>, which should be loaded by the runtime instead of the <code class="language-plaintext highlighter-rouge">xclbin/kernels.xclbin</code> when running on F1 instances.
+In our standard runtime, this is <a href="https://github.com/dsuess/nn-on-fpgas/blob/7d900e9370bbe4583e10114abd10585c8a043e37/src/utils.hpp#L9">automatically done</a> based on compile time flags.
+We copy this file to the S3 bucket for later use.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>aws s3 <span class="nb">cp </span>xclbin/kernels.awsxclbin s3://fpga-storage/
+</code></pre></div></div>
+
+<p>Additionally, there’s should be a <code class="language-plaintext highlighter-rouge">*_afi_id.txt</code> file created that contains the AFI ID.
+Using the AFI ID, we can check the status of the conversion processes running in the background:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">export </span><span class="nv">AFI_ID</span><span class="o">=</span><span class="si">$(</span><span class="nb">cat</span> <span class="k">*</span>_afi_id.txt | jq <span class="nt">-r</span> <span class="s2">".FpgaImageId"</span><span class="si">)</span>
+<span class="nv">$ </span>aws ec2 describe-fpga-images <span class="nt">--fpga-image-ids</span> <span class="nv">$AFI_ID</span>
+</code></pre></div></div>
+
+<p>Note that when running the <code class="language-plaintext highlighter-rouge">create_vitis_afi.sh</code> script multiple times, multiple files that fit the glob-pattern of the first command will be in the directory.
+Either choose the correct one by hand or delete all of them and re-run the script.<br />
+Once the state code outputted by the describe-fpga-images command changes from “pending” to “available”, we are ready to finally run the example on an FPGA hardware device.
+For this, follow the <a href="#setting-up-the-ec2-instance">original setup steps</a>, but choose an F1-instance type.
+After cloning the example repo, we need to build everything <strong>except</strong> the kernels</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir </span>build <span class="o">&amp;&amp;</span> <span class="nb">cd </span>build <span class="o">&amp;&amp;</span> cmake3 <span class="nt">-DTARGET</span><span class="o">=</span>hw .. <span class="o">&amp;&amp;</span> make emconfig.json main tests
+</code></pre></div></div>
+
+<p>We can simply copy the AFI kernel binary from S3</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">mkdir </span>xclbin <span class="o">&amp;&amp;</span> aws s3 <span class="nb">cp </span>s3://fpga-storage/kernels.awsxclbin xclbin/
+</code></pre></div></div>
+
+<p>And run both the tests and the example application on the FPGA:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>./tests
+<span class="nv">$ </span>./main
+</code></pre></div></div>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>This finished the first post in the “From Scratch: Neural Network Inference on FPGAs” series, which covered the basics in how to develop applications for FPGAs.
+In the <a href="/blog/2021-05-10-fpga-part-2/">next post</a> we will look at the implementation in a bit more detail.</p>
+
+<blockquote>
+  <p><em>Cover Image</em> by <a href="https://commons.wikimedia.org/wiki/File:Xilinx_FPGA_XCV400E-PQ240.jpg">Pedant01</a> CC BY-SA 4.0</p>
+</blockquote>
+
+  </div><a class="u-url" href="/blog/2021-05-09-fpga-part-1/" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/dsuess" title="dsuess"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://www.linkedin.com/in/daniel-suess" title="daniel-suess"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#linkedin"></use></svg></a></li><li><a rel="me" href="https://twitter.com/suess_daniel" title="suess_daniel"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
