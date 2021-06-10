@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary_large_image" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>The randomized truncated SVD | Matmuls all the way down</title>
+<meta name="generator" content="Jekyll v4.1.1" />
+<meta property="og:title" content="The randomized truncated SVD" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Daniel Suess’ personal blog" />
+<meta property="og:description" content="Daniel Suess’ personal blog" />
+<link rel="canonical" href="https://dsuess.github.io/blog/2021-06-10-truncated-svd/" />
+<meta property="og:url" content="https://dsuess.github.io/blog/2021-06-10-truncated-svd/" />
+<meta property="og:site_name" content="Matmuls all the way down" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2021-06-10T00:00:00-05:00" />
+<script type="application/ld+json">
+{"url":"https://dsuess.github.io/blog/2021-06-10-truncated-svd/","@type":"BlogPosting","headline":"The randomized truncated SVD","dateModified":"2021-06-10T00:00:00-05:00","datePublished":"2021-06-10T00:00:00-05:00","mainEntityOfPage":{"@type":"WebPage","@id":"https://dsuess.github.io/blog/2021-06-10-truncated-svd/"},"description":"Daniel Suess’ personal blog","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://dsuess.github.io/blog/feed.xml" title="Matmuls all the way down" /><link rel="shortcut icon" type="image/x-icon" href="/blog/assets/img/favicon.ico"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Primer/15.2.0/primer.css" integrity="sha512-xTz2ys4coGAOz8vuV1NcQBkgVmKhsSEtjbqyMJbBHRplFuvKIUo6xhLHpAyPt9mfR6twHJgn9OgVLuqOvjeBhg==" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css" integrity="sha512-1PKOgIY59xJ8Co8+NE6FZ+LOAZKjy+KY8iq0G4B3CyeY6wYHN3yt9PW0XpSriVlkMXe40PTKnXrLnZ9+fkDaog==" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/katex.min.css" integrity="sha512-h7nl+xz8wgDlNM4NqKEM4F1NkIRS17M9+uJwIGwuo8vGqIl4BhuCKdxjWEINm+xyrUjNCnK5dCrhM0sj+wTIXw==" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/katex.min.js" integrity="sha512-/CMIhXiDA3m2c9kzRyd97MTb3MC6OVnx4TElQ7fkkoRghwDf6gi41gaT1PwF270W6+J60uTmwgeRpNpJdRV6sg==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.12.0/contrib/auto-render.min.js" integrity="sha512-Do7uJAaHZm5OLrIv/yN4w0iG1dbu01kzdMNnFfu/mAqgUk6Nniv2JYHcwH+cNwjqgLcqcuBBk+JRvprLVI8azg==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha512-0doc9hKxR3PYwso42RD1p5ySZpzzuDiOwMrdCEh2WdJZCjcmFKc/wEnL+z8fBQrnHoiNWbo+3fiGkOYXBdQp4A==" crossorigin="anonymous"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement( document.body, {
+        delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "[%", right: "%]", display: true},
+            {left: "$", right: "$", display: false}
+        ]}
+        );
+    });
+    </script>
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Matmuls all the way down</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/blog/_pages/about/">About</a><a class="page-link" href="/blog/search/">Search</a><a class="page-link" href="/blog/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">The randomized truncated SVD</h1><h2 class="post-subtitle p-name">Orː How I learned to stop worrying and love the possibility of failure</h2><p class="post-meta post-meta-title">Posted on
+      <time class="dt-published" datetime="2021-06-10T00:00:00-05:00" itemprop="datePublished">
+        Jun 10, 2021
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      12 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i>
+      
+        <a class="category-tags-link" href="/blog/categories/#data science">data science</a>
+        &nbsp;
+      
+        <a class="category-tags-link" href="/blog/categories/#algorithms">algorithms</a>
+        
+      
+      </p>
+    
+
+    
+      
+        <div class="pb-5 d-flex flex-wrap flex-justify-end">
+          <div class="px-2">
+
+    <a href="https://github.com/dsuess/blog/tree/master/_notebooks/2021-06-10-truncated-svd.ipynb" role="button" target="_blank">
+<img class="notebook-badge-image" src="/blog/assets/badges/github.svg" alt="View On GitHub">
+    </a>
+</div>
+
+          <div class="px-2">
+    <a href="https://mybinder.org/v2/gh/dsuess/blog/master?filepath=_notebooks%2F2021-06-10-truncated-svd.ipynb" target="_blank">
+        <img class="notebook-badge-image" src="/blog/assets/badges/binder.svg" alt="Open In Binder"/>
+    </a>
+</div>
+
+          <div class="px-2">
+    <a href="https://colab.research.google.com/github/dsuess/blog/blob/master/_notebooks/2021-06-10-truncated-svd.ipynb" target="_blank">
+        <img class="notebook-badge-image" src="/blog/assets/badges/colab.svg" alt="Open In Colab"/>
+    </a>
+</div>
+        </div>
+      </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <!--
+#################################################
+### THIS FILE WAS AUTOGENERATED! DO NOT EDIT! ###
+#################################################
+# file to edit: _notebooks/2021-06-10-truncated-svd.ipynb
+-->
+
+<div class="container" id="notebook-container">
+        
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>There are many things that make a great algorithm:
+Providing a solution to an actual problem is definitely important.
+Additional points if the algorithm is fast or easy to explain.
+However, not many algorithms contain a piece of life advice.</p>
+<p>In this post, I'll talk about one algorithm that ticks all these boxes: the randomized truncated singular-value decomposition (SVD).
+I'll cover the idea and a basic implementation in 15 lines of Python.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Introduction">Introduction<a class="anchor-link" href="#Introduction"> </a></h2><p>The singular value decomposition of a $m \times n$ real matrix $M$ is a factorization</p>
+$$
+M = U \Sigma V^\mathrm{T},
+$$<p>where $\Sigma$ is a $r \times r$ diagonal matrix with non-negative entries called singular values and $V^\mathrm{T}$ denotes the transpose of $V$.
+Additionally, the columns of $U \in \mathbb{R}^{m \times r}$ and $V \in \mathbb{R}^{n \times r}$ are orthonormal and called left-singular vectors and right-singular vectors, respectively.</p>
+<p>One common use case of the SVD is principle component analysis (PCA), which is the most fundamental dimensionality reduction technique. 
+The PCA can be computed using the SVD of the centered data matrix $X$, which has $N$ rows and each row represents one sample of a $n$ dimensional feature vector.
+$X$ being centered means that column means have been subtracted and are now equal to zero.</p>
+<p>The <a href="https://stats.stackexchange.com/questions/134282/relationship-between-svd-and-pca-how-to-use-svd-to-perform-pca">relationship</a> between SVD and PCA can be summarized as follows:
+Denote by $\sigma_1$ the largest singular value of $\frac{1}{\sqrt{N - 1}} X$ and by $V_1$ the corresponding right-singular vector.
+Then, $V_1$ gives the direction with the largest variance of the data and $\sigma_1$ is the explained variance in this direction.
+The right-singular vector $V_2$ of the next-largest singular value then represents the direction of largest variance in the dataset not explained by $V_1$, etc.
+In the case of a dataset with only $n = 2$ features, we can visualize these directions together with the original data points:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<details class="description">
+      <summary class="btn btn-sm" data-open="Hide Code" data-close="Show Code"></summary>
+        <p><div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">N</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">multivariate_normal</span><span class="p">(</span><span class="n">cov</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.4</span><span class="p">,</span> <span class="mi">1</span><span class="p">]]))</span><span class="o">.</span><span class="n">rvs</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="n">N</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="n">samples</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="n">samples</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]})</span>
+<span class="n">SVD</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">&quot;SVD&quot;</span><span class="p">,</span> <span class="s2">&quot;U, S, V&quot;</span><span class="p">)</span>
+<span class="n">svd</span> <span class="o">=</span> <span class="n">SVD</span><span class="p">(</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">samples</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">N</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+
+<span class="n">scatter_plot</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">alt</span><span class="o">.</span><span class="n">Chart</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">mark_point</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="s2">&quot;cross&quot;</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Scale</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Scale</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))),</span>
+    <span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">properties</span><span class="p">(</span>
+    <span class="n">width</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
+    <span class="n">height</span><span class="o">=</span><span class="mi">400</span>
+<span class="p">)</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">svd</span><span class="o">.</span><span class="n">V</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">svd</span><span class="o">.</span><span class="n">V</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> 
+    <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">svd</span><span class="o">.</span><span class="n">V</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">svd</span><span class="o">.</span><span class="n">V</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
+    <span class="s2">&quot;Legend&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;σ₁V₁&#39;</span><span class="p">,</span> <span class="s1">&#39;σ₁V₁&#39;</span><span class="p">,</span> <span class="s1">&#39;σ₂V₂&#39;</span><span class="p">,</span> <span class="s1">&#39;σ₂V₂&#39;</span><span class="p">]</span>
+<span class="p">})</span>
+
+<span class="n">arrow_plot</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">alt</span><span class="o">.</span><span class="n">Chart</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">mark_line</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="s2">&quot;Legend&quot;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;Legend&quot;</span>
+    <span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+
+<span class="n">alt</span><span class="o">.</span><span class="n">layer</span><span class="p">(</span><span class="n">scatter_plot</span><span class="p">,</span> <span class="n">arrow_plot</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+</p>
+    </details>
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+
+<div id="altair-viz-9b936e7f225c4499929692f5f97afbbc"></div>
+<script type="text/javascript">
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    if (outputDiv.id !== "altair-viz-9b936e7f225c4499929692f5f97afbbc") {
+      outputDiv = document.getElementById("altair-viz-9b936e7f225c4499929692f5f97afbbc");
+    }
+    const paths = {
+      "vega": "https://cdn.jsdelivr.net/npm//vega@5?noext",
+      "vega-lib": "https://cdn.jsdelivr.net/npm//vega-lib?noext",
+      "vega-lite": "https://cdn.jsdelivr.net/npm//vega-lite@4.8.1?noext",
+      "vega-embed": "https://cdn.jsdelivr.net/npm//vega-embed@6?noext",
+    };
+
+    function loadScript(lib) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = paths[lib];
+        s.async = true;
+        s.onload = () => resolve(paths[lib]);
+        s.onerror = () => reject(`Error loading script: ${paths[lib]}`);
+        document.getElementsByTagName("head")[0].appendChild(s);
+      });
+    }
+
+    function showError(err) {
+      outputDiv.innerHTML = `<div class="error" style="color:red;">${err}</div>`;
+      throw err;
+    }
+
+    function displayChart(vegaEmbed) {
+      vegaEmbed(outputDiv, spec, embedOpt)
+        .catch(err => showError(`Javascript Error: ${err.message}<br>This usually means there's a typo in your chart specification. See the javascript console for the full traceback.`));
+    }
+
+    if(typeof define === "function" && define.amd) {
+      requirejs.config({paths});
+      require(["vega-embed"], displayChart, err => showError(`Error loading script: ${err.message}`));
+    } else if (typeof vegaEmbed === "function") {
+      displayChart(vegaEmbed);
+    } else {
+      loadScript("vega")
+        .then(() => loadScript("vega-lite"))
+        .then(() => loadScript("vega-embed"))
+        .catch(showError)
+        .then(() => displayChart(vegaEmbed));
+    }
+  })({"config": {"view": {"continuousWidth": 400, "continuousHeight": 300}}, "layer": [{"data": {"name": "data-a087bbc9e69b4787cd3e0e174411c51a"}, "mark": {"type": "point", "shape": "cross", "size": 40}, "encoding": {"x": {"type": "quantitative", "field": "x", "scale": {"domain": [-2, 2]}}, "y": {"type": "quantitative", "field": "y", "scale": {"domain": [-2, 2]}}}, "height": 400, "selection": {"selector001": {"type": "interval", "bind": "scales", "encodings": ["x", "y"]}}, "width": 400}, {"data": {"name": "data-0f06e93adaa871f55e392cade13e5e42"}, "mark": "line", "encoding": {"color": {"type": "nominal", "field": "Legend"}, "detail": {"type": "nominal", "field": "Legend"}, "x": {"type": "quantitative", "field": "x"}, "y": {"type": "quantitative", "field": "y"}}, "selection": {"selector002": {"type": "interval", "bind": "scales", "encodings": ["x", "y"]}}}], "$schema": "https://vega.github.io/schema/vega-lite/v4.8.1.json", "datasets": {"data-a087bbc9e69b4787cd3e0e174411c51a": [{"x": 0.499040111386132, "y": 1.3470753877825756}, {"x": 0.8893084692225819, "y": -0.46142280514040807}, {"x": 3.276295668760406, "y": 2.0492122164959596}, {"x": 2.3174675881421516, "y": 0.6242142653079025}, {"x": -0.34896610632088315, "y": -0.2407992313418399}, {"x": 1.8145734956949433, "y": -0.09657426709013404}, {"x": 1.7874266447849825, "y": -0.03422257229808862}, {"x": 0.40739936092696594, "y": 0.47393487365581805}, {"x": 0.3095368325940749, "y": -0.54822613131681}, {"x": 0.07937473323515847, "y": 1.5596829994480323}, {"x": 0.15986176922911052, "y": 1.3634140895507334}, {"x": 0.13984547185841728, "y": -1.7333897201933652}, {"x": 0.783133412361637, "y": 0.0900017732362748}, {"x": -1.2674899473512928, "y": -0.42296255878726424}, {"x": 0.04140709148330074, "y": -0.16027847623158517}, {"x": -1.0375694427446673, "y": -0.1170009850198884}, {"x": -1.0737725967980973, "y": 0.5320306553011561}, {"x": -2.1808002214053834, "y": 0.6830025324801903}, {"x": -0.26309120538248043, "y": 0.06230067222972742}, {"x": 0.08393603561954428, "y": -0.23288835050189682}, {"x": -0.2806928979745076, "y": 1.012519589776966}, {"x": 1.034346311277731, "y": 0.37253384035773623}, {"x": 0.7833252894176486, "y": 1.1237979536126728}, {"x": 0.12685790327313398, "y": 0.3829824032775471}, {"x": -1.0384156128045705, "y": -0.48180198419285564}, {"x": 0.544533979558484, "y": 2.133056817982007}, {"x": 1.5025932397607147, "y": -1.524532322481498}, {"x": -1.5783288578599517, "y": -1.9540745689832237}, {"x": -0.12303607388399958, "y": -1.3019671784643458}, {"x": -0.996514410138908, "y": -0.4687156305052088}, {"x": -0.3236576259742412, "y": 0.5888860622813334}, {"x": 1.2027713085917062, "y": -0.9413634397421471}, {"x": 0.4946461394725268, "y": -1.7479130493751165}, {"x": -1.427881657149866, "y": 0.5667091573546742}, {"x": 0.14263406910966944, "y": -0.422566726444803}, {"x": -0.6901912031033033, "y": 0.66368408816094}, {"x": -0.2951322527026031, "y": -0.09462055006034714}, {"x": -1.0174638941728904, "y": -0.414516449330645}, {"x": -2.2034409685955025, "y": -1.6827316117278477}, {"x": 0.8603622003717634, "y": 1.9724497213471117}, {"x": -0.9808905212653228, "y": -0.7018106186521499}, {"x": 1.3504375037753196, "y": 0.8950520049312706}, {"x": -0.08652584837822755, "y": 0.1466761444960618}, {"x": -2.1869139773391284, "y": -0.39584412684681936}, {"x": 1.8268752119931515, "y": 1.498402898230798}, {"x": -0.3007409900554471, "y": 0.38904351212483895}, {"x": 0.5976740191642422, "y": 1.5089773635032342}, {"x": -0.5855513864547949, "y": -1.9190691339557842}, {"x": -0.4084330356421615, "y": -0.946423739888817}, {"x": 0.01168133603944243, "y": -0.020823202261529374}, {"x": -0.6903577555325704, "y": -0.464079367178926}, {"x": -0.06978049514645637, "y": -0.1710601410449856}, {"x": 0.05954870523115755, "y": 0.5654537003525341}, {"x": 1.0979203785221816, "y": 0.8160340532834058}, {"x": -0.5461272840170784, "y": -1.6159937700806593}, {"x": -0.6389984497203159, "y": 0.8630230968536494}, {"x": 1.0464439175696014, "y": -0.2839937358569262}, {"x": 0.03190520076212111, "y": 0.3213329450668664}, {"x": 1.003421424607274, "y": 0.20168240398280202}, {"x": -0.11587087213616874, "y": 1.3453791820355345}, {"x": -0.09827350112442443, "y": -2.4555223911367934}, {"x": 0.6635519877037162, "y": -0.1496629617370987}, {"x": -1.603290897019423, "y": -0.8190875284377619}, {"x": -0.7827662061657752, "y": -0.9717754414982733}, {"x": -0.9654701356619326, "y": 0.9093147042368918}, {"x": 0.0895960526000847, "y": 0.9049966217644665}, {"x": -0.6365449272784803, "y": -0.46827727609794173}, {"x": -0.8978603606533904, "y": 0.7704705092917186}, {"x": -0.15734077896079762, "y": 1.1396631476842347}, {"x": -0.5333210759849282, "y": -1.190108757411736}, {"x": -0.0260369862756715, "y": -1.3268043936460068}, {"x": -0.6226022149528861, "y": -0.3195985658870363}, {"x": 1.6859099476373904, "y": 1.462378901363131}, {"x": 0.7365703761778056, "y": 0.2040742158158971}, {"x": -0.2465088190013837, "y": 0.13375036842454735}, {"x": -2.673329868129686, "y": -0.47497711638964235}, {"x": -0.6047732269980164, "y": -0.54209702136867}, {"x": -0.8868553632482525, "y": 0.10993690655696459}, {"x": -1.0203296766571681, "y": -0.31922427774001005}, {"x": -0.5117634346869507, "y": 0.4604542305320255}, {"x": 0.4488104345832673, "y": 0.6919244282475412}, {"x": 0.2710722998142477, "y": -1.816370704630447}, {"x": -0.6080436060882418, "y": 0.29179926284490587}, {"x": 0.857777169268732, "y": -0.9673893791770891}, {"x": 0.561923065356995, "y": -0.3702277576463317}, {"x": 0.8111302533846394, "y": 0.4546104237489252}, {"x": -0.33151892938562005, "y": 0.10775085278780543}, {"x": -0.4002060475416171, "y": 0.9314523955197536}, {"x": 0.4331411392648113, "y": 1.424226197563164}, {"x": -0.13839500818861253, "y": -0.08205302545761414}, {"x": -0.31607135751580323, "y": -2.186930321845965}, {"x": -2.0587920660437447, "y": -1.1910253862575544}, {"x": -0.39947278273608483, "y": -0.08462723351813939}, {"x": -0.9386170714248696, "y": -0.060193153339546314}, {"x": -0.4398879225613852, "y": 0.392008851915329}, {"x": -0.6213751185174406, "y": 1.422478115401674}, {"x": 0.9655028357447673, "y": 1.8799355396428683}, {"x": 0.30125818359422907, "y": 0.3329843974281067}, {"x": -0.3302581068885809, "y": -0.5888155606701303}, {"x": 2.1930507246898996, "y": 1.167208560975611}, {"x": 1.4667943181258452, "y": 1.2016917816796737}, {"x": -1.2955821791165685, "y": 0.7481953176701147}, {"x": 1.6256912535760615, "y": 0.8634134204931599}, {"x": 0.5112458018634136, "y": 0.4793708472874837}, {"x": 0.29929930193327836, "y": 0.5723422058007137}, {"x": -1.1475263771127462, "y": -2.9188466276591276}, {"x": -1.4036068249792584, "y": 0.24716631702629543}, {"x": -0.10918199060116612, "y": -0.30888287316359786}, {"x": 0.8014428693966539, "y": 0.36220163153421175}, {"x": -0.2925925129096187, "y": 0.19374934063072033}, {"x": -0.23079133849267794, "y": -0.9618716193907085}, {"x": 0.923337009436392, "y": -0.8411045287227248}, {"x": 0.4865421150883096, "y": -1.0739887369969423}, {"x": 1.4091463104421011, "y": 1.2456115769968372}, {"x": 0.17237578071751578, "y": 0.3595344305834708}, {"x": -0.5194298084808909, "y": 0.527997303346859}, {"x": -1.1057691320104952, "y": -1.4506720778154827}, {"x": -1.3105604245775877, "y": -0.9424968161159168}, {"x": -0.4112753044217541, "y": 1.3062054526719484}, {"x": -0.3862826564656429, "y": 0.1673612964916674}, {"x": 0.40755931610255325, "y": -0.3900534820839249}, {"x": -1.9529644473324674, "y": -1.9421749755971132}, {"x": 0.6049424858973425, "y": 0.5731721825583692}, {"x": 0.3292950869551873, "y": -0.6284202025618377}, {"x": -0.3179928531147257, "y": -0.4424067837101952}, {"x": -0.6111976364755264, "y": 1.0307228096788417}, {"x": 0.8836057371665055, "y": 1.2255091435385963}, {"x": 1.0079770406334627, "y": -0.661009624303599}, {"x": 1.3539050097135514, "y": 1.8791277104433517}, {"x": -0.35923133185676653, "y": 0.7171872819797475}, {"x": 0.21063883507261724, "y": 1.8418329723697608}, {"x": -1.2340481174249291, "y": -1.5922315364038284}, {"x": 0.2685558666424998, "y": 0.1201961357271858}, {"x": 0.620681439050865, "y": -0.010566683530850145}, {"x": -2.1276841894261285, "y": -0.7528513123279688}, {"x": 0.24872545574313806, "y": -0.01606048436781633}, {"x": 1.211829122091525, "y": 0.9873472543867245}, {"x": -1.5891350252197887, "y": -0.8848775756137796}, {"x": 0.6621048095364813, "y": -1.7879873824920842}, {"x": 2.267031210705213, "y": 0.6206943597548409}, {"x": 0.5523986424860252, "y": -0.715605437943158}, {"x": 0.365383582108629, "y": 0.11345791064749085}, {"x": 0.73161346599591, "y": 0.4821176725166957}, {"x": 0.0338632816841229, "y": -0.03366895092059218}, {"x": 0.1061053458157493, "y": -0.2829846133943907}, {"x": 0.8779895307458288, "y": -0.23946851023187457}, {"x": 0.6250331669433085, "y": 1.143776930420891}, {"x": 0.4089200299354035, "y": -1.3941759974033052}, {"x": 0.5973502352035653, "y": 0.6039644814857759}, {"x": 0.8297270086201931, "y": 0.08907134140134422}, {"x": 0.02432897110315962, "y": 0.6796359358331449}, {"x": 1.0098172323429557, "y": 0.7945448325281804}, {"x": 1.3054431609629216, "y": 0.41570565406445964}, {"x": -0.1630786653739728, "y": 0.9749171689970871}, {"x": -0.8127626601937048, "y": -0.28317828400934897}, {"x": -0.7955276309194577, "y": 0.494369172896048}, {"x": -1.7031788284580371, "y": -2.1985928421424172}, {"x": -0.10194464401841774, "y": 2.4896365759299144}, {"x": 0.7001562865049353, "y": 1.4077535315795942}, {"x": -1.3552364910625136, "y": -1.1805601741205562}, {"x": -0.3480907083709804, "y": 1.0276535474571602}, {"x": -0.4548371229459116, "y": -0.42948883150633954}, {"x": -1.9686636488156322, "y": 0.8077399567903021}, {"x": -0.8045287440050715, "y": -0.06205252027116885}, {"x": -1.8314034221360456, "y": -0.546444608556147}, {"x": -0.22664275823372002, "y": 0.8443449407760106}, {"x": 0.08404821024061691, "y": 0.5105824877068628}, {"x": 0.6108842107442578, "y": 0.5843138835858875}, {"x": 0.07116348306581154, "y": -0.13705555104673328}, {"x": -1.9237192506551002, "y": -1.7761476337637792}, {"x": 1.2072557267693043, "y": -0.05032868281004468}, {"x": 1.922188750412861, "y": 2.0190893546103874}, {"x": -1.4089866511891724, "y": -0.4504293865777186}, {"x": -0.680296564801022, "y": -1.4911198037364681}, {"x": 0.28620112505624923, "y": 0.7971427417363901}, {"x": -1.5605011877961654, "y": -1.1351193033912872}, {"x": -0.2436076635755065, "y": -0.7297285652271647}, {"x": -0.7293948933398544, "y": -0.8885806249420867}, {"x": 0.08680095640193021, "y": 2.1420460337394682}, {"x": 0.3951488892687733, "y": -0.22566445544272493}, {"x": 0.36199574815445995, "y": 0.08608176431535149}, {"x": 0.9552525962323073, "y": -0.5399015844884587}, {"x": -1.4118984387673323, "y": -0.7690136773428669}, {"x": 0.6287470870935141, "y": -1.3146446825981788}, {"x": 0.49271715080840617, "y": -0.5337912340009711}, {"x": -0.29350753189885403, "y": 1.034235554904204}, {"x": -0.3323227526815641, "y": 1.3477312724128845}, {"x": 0.29472485113174907, "y": 0.5181448498178095}, {"x": -1.326798352481246, "y": -0.1212354512423538}, {"x": 0.2784947478770835, "y": 0.921402090392999}, {"x": -0.8348269277272811, "y": -2.1284682508220714}, {"x": 1.7880924018240665, "y": 0.10298478304238762}, {"x": 2.262646251258262, "y": 0.2660574816470522}, {"x": -0.7215916583254033, "y": -0.12237136170640255}, {"x": 1.4602525680416107, "y": 0.658385674128164}, {"x": -1.4770219102780127, "y": -1.7021206597955076}, {"x": 1.282214071247473, "y": -0.0631332057601641}, {"x": -0.7039008589139386, "y": -0.23554652524591466}, {"x": -0.6417231868512069, "y": -1.1809025855020026}, {"x": 0.7546126409461025, "y": 1.108387505776117}], "data-0f06e93adaa871f55e392cade13e5e42": [{"x": 0.0, "y": 0.0, "Legend": "\u03c3\u2081V\u2081"}, {"x": -0.8480177822893175, "y": -0.850394892437998, "Legend": "\u03c3\u2081V\u2081"}, {"x": 0.0, "y": 0.0, "Legend": "\u03c3\u2082V\u2082"}, {"x": -0.5576391667537219, "y": 0.5560803971345961, "Legend": "\u03c3\u2082V\u2082"}]}}, {"mode": "vega-lite"});
+</script>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>For higher dimensional datasets, the first few largest singular values of $X$ and the corresponding singular vectors often capture a large fraction of the general properties of $X$.
+This combined with its simplicity makes PCA such a widely used tool for dimensionality reduction and data visualization.</p>
+<p>The example of PCA highlights that for many use cases, computing the full SVD is unnecessary.
+Instead, the <em>truncated SVD</em>, i.e. computing the largest singular values and the corresponding singular vectors, is often sufficient. 
+By only computing a small subset of the full SVD, the truncated SVD can also be much faster.
+However, <a href="https://stats.stackexchange.com/questions/159325/what-fast-algorithms-exist-for-computing-truncated-svd">efficient algorithms</a> for truncated SVD such as Krylov subspace methods tend to be complex and challenging to implement.
+That's the reason why most scientific computing packages including <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.linalg.svds.html">Scipy</a> are wrapping libraries like Arpack -- a more than 20 year old implementation in Fortran77.</p>
+<p>This is where the randomized truncated SVD gets to shine:
+Not only can we implement a basic version in 15 lines of Python, that implementation also performs just as well as the much more intricate algorithm used in Scipy.
+And as the cherry on top, we even benefit from GPU acceleration using the same exact implementation in pytorch.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Randomized-Truncated-SVD">Randomized Truncated SVD<a class="anchor-link" href="#Randomized-Truncated-SVD"> </a></h2><p>The idea behind randomized matrix decompositions is quite simple<sup id="fnref-1" class="footnote-ref"><a href="#fn-1">1</a></sup>:
+First, we need to find a $m \times p$ matrix Q with orthonormal columns such that
+$$
+M \approx Q Q^{\mathrm{T}} M
+$$
+We'll refer to this as the Q-condition.
+Next, we compute the (full) SVD for B
+$$
+B = Q^{\mathrm{T}} M = \hat U \Sigma V.
+$$
+The Q-condition now implies, that $U = Q \hat U$ together with $\Sigma$ and $V$ is a SVD for $M$.
+To put this into words: 
+We use the matrix $Q^{\mathrm{T}}$ to "project" $M$, compute the standard SVD of the projection, and then transform the right-singular vectors back using $Q$.</p>
+<p>So why would this algorithm be any faster than simply computing the full SVD?
+Especially since we're computing the full SVD of $B$ as the second step.
+Indeed, the version presented above can only provide a speedup if $p$ is much smaller than $n$, and hence, $B$ has much fewer components than $M$.
+To make things worse, it turns out that with no further restrictions on $M$, the Q-condition is actually impossible<sup id="fnref-2" class="footnote-ref"><a href="#fn-2">2</a></sup> to fulfill unless $p \ge n$.
+However, if we are only interested in the $k$ largest singular values and the matrix $M$ fulfills certain technical conditions, the following construction fulfills a (slightly modified version) of the Q-condition for $p = k + 10$ <strong>with high probability</strong><sup id="fnref-1" class="footnote-ref"><a href="#fn-1">1</a></sup>:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">randomized_range_finder</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">n_iter</span><span class="p">,</span> <span class="n">n_oversamples</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+    <span class="c1"># Intialize Q randomly using Normal-distributed components</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">size</span> <span class="o">+</span> <span class="n">n_oversamples</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">M</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="c1"># Perform power-iteration a few times</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_iter</span><span class="p">):</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="p">(</span><span class="n">M</span> <span class="o">@</span> <span class="n">Q</span><span class="p">)</span>
+    <span class="c1"># Ortho-normalize the columns of Q</span>
+    <span class="n">Q</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">qr</span><span class="p">(</span><span class="n">M</span> <span class="o">@</span> <span class="n">Q</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">Q</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>As previously mentioned, the matrix $Q$ returned from <code>randomized_range_finder</code> requires $p$ to be only marginally larger than the number of singular values $k$ we are trying to compute.
+This results in a tremendous speed-up compared to the full PCA in case $k$ is much smaller than $n$ as commonly the case, e.g. for PCA.
+We will confirm this in the experiments section below.</p>
+<p>Before we discuss the elephant in the room, namely the fact that above statement is only true with high probability, let us complete the implementation by turning the truncated SVD algorithm from the beginning of this section into code:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">SVD</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">&quot;SVD&quot;</span><span class="p">,</span> <span class="s2">&quot;U, S, V&quot;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">randomized_svd</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">n_components</span><span class="p">):</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">randomized_range_finder</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">n_components</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+    <span class="c1"># Project M</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">@</span> <span class="n">M</span>
+    <span class="c1"># Compute full SVD of B</span>
+    <span class="n">Uhat</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">Vt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>
+    <span class="c1"># Un-project U</span>
+    <span class="n">U</span> <span class="o">=</span> <span class="n">Q</span> <span class="o">@</span> <span class="n">Uhat</span>
+    <span class="k">return</span> <span class="n">SVD</span><span class="p">(</span><span class="n">U</span><span class="p">[:,</span> <span class="p">:</span><span class="n">n_components</span><span class="p">],</span> <span class="n">s</span><span class="p">[:</span><span class="n">n_components</span><span class="p">],</span> <span class="n">Vt</span><span class="p">[:</span><span class="n">n_components</span><span class="p">,</span> <span class="p">:])</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The qualifier "with high probability" for <code>randomized_range_finder</code> implies that there is a small <em>chance</em> that $Q$ computed in this way does not fulfill the Q-condition and the resulting truncated SVD is wrong.
+This probabilistic nature is in stark contrast to the majority of linear algebra algorithms, which are deterministic.
+It also implies that we can never be 100% sure that the result we obtained is correct.
+However, the reason why the randomized truncated SVD is so powerful in practice is that we have full control over its failure probability:
+We can make the failure probability smaller by increasing the constant in the formula for $p = k + \ldots$.
+In fact, the choice $p = k + 10$ ensures that the probability of failure is so small that it can be considered to be zero for all practical purposes.
+In other words, even though there is a small chance of the algorithm failing, it is so small that we will never encounter this in practice.</p>
+<p>And this is where a simple algorithm turns into life advise: 
+If we require a solution for the truncated SVD that's perfect – both fast and 100% reliable – we end up with a very complex solution.
+The kind of solution I would have never chosen to write a blog post about voluntarily.
+However, by giving us a little bit of room for failure, we end up with a much more elegant and simple solution.
+And by controlling the probability of these failure cases, we can make sure that they remain a theoretical possibility only and and that they will never occur in practice.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Testing-it-out">Testing it out<a class="anchor-link" href="#Testing-it-out"> </a></h2><p>As mentioned above, the randomized truncated SVD as it's implemented here works only if the matrix $M$ fulfills certain technical conditions. 
+The most important one is that the singular values we're discarding are small enough such that they can be distinguished sufficiently easy from the singular values we're interested in.
+In practice this is often the case since otherwise we would not discard those singular values in the first place (e.g. in the case of PCA).
+There are also further improvements to the algorithm that make them more stable if this is not the case, and hence, these versions rely less on this assumption (see for example the <a href="https://github.com/scikit-learn/scikit-learn/blob/a25382629b6c3a2bb41d486a45f9dde6ccd021dc/sklearn/utils/extmath.py#L243">implementation</a> used in scikit-learn).</p>
+<p>Here, we take the easy way out and simply generate matrices that fulfill these conditions using the following functions:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">sample_lowrank_matrix</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">max_rank</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">noise</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">max_rank</span><span class="p">)</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">A</span> <span class="o">@</span> <span class="n">A</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">size</span> <span class="o">+</span> <span class="n">noise</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span> 
+    <span class="k">return</span> <span class="n">M</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>These are matrices that have only <code>max_rank</code> non-zero singular values in case <code>noise == 0.0</code>. 
+If we set <code>noise</code> to some non-zero value, but keep it small enough, the singular values will still be sufficiently different for the truncated algorithm to work well.</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">M</span> <span class="o">=</span> <span class="n">sample_lowrank_matrix</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="n">svd_random</span> <span class="o">=</span> <span class="n">randomized_svd</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+<span class="n">svd_standard</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">svd</span><span class="p">(</span><span class="n">M</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<details class="description">
+      <summary class="btn btn-sm" data-open="Hide Code" data-close="Show Code"></summary>
+        <p><div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">to_numpy</span><span class="p">(</span><span class="n">svd</span><span class="p">:</span> <span class="n">SVD</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">SVD</span><span class="p">(</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">svd</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">svd_flip</span><span class="p">(</span><span class="n">svd</span><span class="p">:</span> <span class="n">SVD</span><span class="p">):</span>
+    <span class="n">max_abs_cols</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">svd</span><span class="o">.</span><span class="n">U</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">signs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">svd</span><span class="o">.</span><span class="n">U</span><span class="p">[</span><span class="n">max_abs_cols</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">svd</span><span class="o">.</span><span class="n">U</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
+    <span class="n">svd</span><span class="o">.</span><span class="n">U</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">signs</span>
+    <span class="n">svd</span><span class="o">.</span><span class="n">V</span><span class="p">[:]</span> <span class="o">*=</span> <span class="n">signs</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">svd</span>
+
+<span class="k">def</span> <span class="nf">plot_singular_values</span><span class="p">(</span><span class="n">limit_ranks</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">to_numpy</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;Rank&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">))[:</span><span class="n">limit_ranks</span><span class="p">],</span> 
+                <span class="s2">&quot;Value&quot;</span><span class="p">:</span> <span class="n">svd</span><span class="o">.</span><span class="n">S</span><span class="p">[:</span><span class="n">limit_ranks</span><span class="p">],</span> 
+                <span class="s2">&quot;Algorithm&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">svd</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">]</span>                                                                           
+    <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">alt</span><span class="o">.</span><span class="n">Chart</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">mark_point</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Rank&quot;</span><span class="p">,</span> 
+            <span class="n">y</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="s2">&quot;Value&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Singular Value&quot;</span><span class="p">)),</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">&quot;Algorithm&quot;</span><span class="p">,</span> 
+            <span class="n">shape</span><span class="o">=</span><span class="s2">&quot;Algorithm&quot;</span><span class="p">,</span>
+            <span class="n">tooltip</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Algorithm&quot;</span><span class="p">,</span> <span class="s2">&quot;Value&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">plot_singular_vector_errors</span><span class="p">(</span><span class="n">svd1</span><span class="p">,</span> <span class="n">svd2</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">limit_ranks</span><span class="p">):</span>
+    <span class="n">svd1</span><span class="p">,</span> <span class="n">svd2</span> <span class="o">=</span> <span class="n">to_numpy</span><span class="p">(</span><span class="n">svd_flip</span><span class="p">(</span><span class="n">svd1</span><span class="p">)),</span> <span class="n">to_numpy</span><span class="p">(</span><span class="n">svd_flip</span><span class="p">(</span><span class="n">svd2</span><span class="p">))</span>
+    <span class="n">errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">svd1</span><span class="o">.</span><span class="n">U</span><span class="p">[:,</span> <span class="p">:</span><span class="n">limit_ranks</span><span class="p">]</span> <span class="o">-</span> <span class="n">svd2</span><span class="o">.</span><span class="n">U</span><span class="p">[:,</span> <span class="p">:</span><span class="n">limit_ranks</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;Rank&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">errors</span><span class="p">)),</span> <span class="s2">&quot;Error&quot;</span><span class="p">:</span><span class="n">errors</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">alt</span><span class="o">.</span><span class="n">Chart</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">mark_line</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">,</span> <span class="n">strokeDash</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">])</span>
+        <span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+            <span class="n">x</span><span class="o">=</span><span class="s2">&quot;Rank&quot;</span><span class="p">,</span> 
+            <span class="n">y</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span>
+                <span class="s2">&quot;Error&quot;</span><span class="p">,</span> 
+                <span class="n">axis</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;Singular Vector Error&#39;</span><span class="p">,</span> <span class="n">titleColor</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">),</span> 
+                <span class="c1">#scale=alt.Scale(domain=(0, 1.414))</span>
+            <span class="p">),</span>
+            <span class="n">tooltip</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Error&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+
+<span class="n">alt</span><span class="o">.</span><span class="n">layer</span><span class="p">(</span>
+    <span class="n">plot_singular_values</span><span class="p">(</span><span class="n">limit_ranks</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s2">&quot;SVD&quot;</span><span class="p">:</span> <span class="n">svd_random</span><span class="p">,</span> <span class="s2">&quot;Randomized SVD&quot;</span><span class="p">:</span> <span class="n">svd_standard</span><span class="p">}),</span>
+    <span class="n">plot_singular_vector_errors</span><span class="p">(</span><span class="n">svd_random</span><span class="p">,</span> <span class="n">svd_standard</span><span class="p">,</span> <span class="n">limit_ranks</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">resolve_scale</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="s2">&quot;independent&quot;</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+</p>
+    </details>
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+
+<div id="altair-viz-daa775c3ef874c4ab3f8d0802fde2be1"></div>
+<script type="text/javascript">
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    if (outputDiv.id !== "altair-viz-daa775c3ef874c4ab3f8d0802fde2be1") {
+      outputDiv = document.getElementById("altair-viz-daa775c3ef874c4ab3f8d0802fde2be1");
+    }
+    const paths = {
+      "vega": "https://cdn.jsdelivr.net/npm//vega@5?noext",
+      "vega-lib": "https://cdn.jsdelivr.net/npm//vega-lib?noext",
+      "vega-lite": "https://cdn.jsdelivr.net/npm//vega-lite@4.8.1?noext",
+      "vega-embed": "https://cdn.jsdelivr.net/npm//vega-embed@6?noext",
+    };
+
+    function loadScript(lib) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = paths[lib];
+        s.async = true;
+        s.onload = () => resolve(paths[lib]);
+        s.onerror = () => reject(`Error loading script: ${paths[lib]}`);
+        document.getElementsByTagName("head")[0].appendChild(s);
+      });
+    }
+
+    function showError(err) {
+      outputDiv.innerHTML = `<div class="error" style="color:red;">${err}</div>`;
+      throw err;
+    }
+
+    function displayChart(vegaEmbed) {
+      vegaEmbed(outputDiv, spec, embedOpt)
+        .catch(err => showError(`Javascript Error: ${err.message}<br>This usually means there's a typo in your chart specification. See the javascript console for the full traceback.`));
+    }
+
+    if(typeof define === "function" && define.amd) {
+      requirejs.config({paths});
+      require(["vega-embed"], displayChart, err => showError(`Error loading script: ${err.message}`));
+    } else if (typeof vegaEmbed === "function") {
+      displayChart(vegaEmbed);
+    } else {
+      loadScript("vega")
+        .then(() => loadScript("vega-lite"))
+        .then(() => loadScript("vega-embed"))
+        .catch(showError)
+        .then(() => displayChart(vegaEmbed));
+    }
+  })({"config": {"view": {"continuousWidth": 400, "continuousHeight": 300}}, "layer": [{"data": {"name": "data-6402545a8fadb438c082b1e3419fcb75"}, "mark": {"type": "point", "size": 40}, "encoding": {"color": {"type": "nominal", "field": "Algorithm"}, "shape": {"type": "nominal", "field": "Algorithm"}, "tooltip": [{"type": "nominal", "field": "Algorithm"}, {"type": "quantitative", "field": "Value"}], "x": {"type": "quantitative", "field": "Rank"}, "y": {"type": "quantitative", "axis": {"title": "Singular Value"}, "field": "Value"}}, "selection": {"selector003": {"type": "interval", "bind": "scales", "encodings": ["x", "y"]}}}, {"data": {"name": "data-5f1467f1ad9242d7db0b0fe0a03551c2"}, "mark": {"type": "line", "color": "gray", "strokeDash": [2, 2]}, "encoding": {"tooltip": [{"type": "quantitative", "field": "Error"}], "x": {"type": "quantitative", "field": "Rank"}, "y": {"type": "quantitative", "axis": {"title": "Singular Vector Error", "titleColor": "gray"}, "field": "Error"}}, "selection": {"selector004": {"type": "interval", "bind": "scales", "encodings": ["x", "y"]}}}], "resolve": {"scale": {"y": "independent"}}, "$schema": "https://vega.github.io/schema/vega-lite/v4.8.1.json", "datasets": {"data-6402545a8fadb438c082b1e3419fcb75": [{"Rank": 0, "Value": 1.0565063953399658, "Algorithm": "SVD"}, {"Rank": 1, "Value": 1.0148131847381592, "Algorithm": "SVD"}, {"Rank": 2, "Value": 0.9988871812820435, "Algorithm": "SVD"}, {"Rank": 3, "Value": 0.9541416168212891, "Algorithm": "SVD"}, {"Rank": 4, "Value": 0.890209436416626, "Algorithm": "SVD"}, {"Rank": 5, "Value": 2.930237030795979e-08, "Algorithm": "SVD"}, {"Rank": 6, "Value": 2.7026068494251376e-08, "Algorithm": "SVD"}, {"Rank": 7, "Value": 2.657505682179817e-08, "Algorithm": "SVD"}, {"Rank": 8, "Value": 2.540315335863852e-08, "Algorithm": "SVD"}, {"Rank": 9, "Value": 2.4707670576162855e-08, "Algorithm": "SVD"}, {"Rank": 0, "Value": 1.0565063953399658, "Algorithm": "Randomized SVD"}, {"Rank": 1, "Value": 1.0148136615753174, "Algorithm": "Randomized SVD"}, {"Rank": 2, "Value": 0.9988870620727539, "Algorithm": "Randomized SVD"}, {"Rank": 3, "Value": 0.9541417956352234, "Algorithm": "Randomized SVD"}, {"Rank": 4, "Value": 0.8902095556259155, "Algorithm": "Randomized SVD"}, {"Rank": 5, "Value": 8.735362371226074e-07, "Algorithm": "Randomized SVD"}, {"Rank": 6, "Value": 7.8894998978285e-07, "Algorithm": "Randomized SVD"}, {"Rank": 7, "Value": 7.058805522319744e-07, "Algorithm": "Randomized SVD"}, {"Rank": 8, "Value": 6.335479270092037e-07, "Algorithm": "Randomized SVD"}, {"Rank": 9, "Value": 5.772844247076137e-07, "Algorithm": "Randomized SVD"}], "data-5f1467f1ad9242d7db0b0fe0a03551c2": [{"Rank": 0, "Error": 1.0552496860327665e-05}, {"Rank": 1, "Error": 2.325863351870794e-05}, {"Rank": 2, "Error": 2.2786234694649465e-05}, {"Rank": 3, "Error": 5.680009508068906e-06}, {"Rank": 4, "Error": 4.656014880310977e-06}, {"Rank": 5, "Error": 1.444787621498108}, {"Rank": 6, "Error": 1.4138785600662231}, {"Rank": 7, "Error": 1.3476427793502808}, {"Rank": 8, "Error": 1.3953497409820557}, {"Rank": 9, "Error": 1.4671616554260254}]}}, {"mode": "vega-lite"});
+</script>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>This plot shows the singular values in descending order on the left y-axis using the x-axis to distinguish between them.
+We compute the singular values either using our truncated SVD implementation (blue circles) or using full SVD (orange squares).
+Both methods agree very well.
+Since we set <code>max_rank</code> for the matrix <code>M</code> to 5, only the first five singular values are nonzero.</p>
+<p>The dotted line, which is scaled w.r.t. the right y-axis, shows the distance between the singular vectors computed with each method.
+As long as the singular values are non-zero both methods agree very well.
+However, for the vanishing singular values, the corresponding singular vectors show a very large discrepancy. 
+This is due to the fact that there's no natural order for the vanishing singular values anymore and the $i$-th singular vector computed with one method does not need to match with the $i$-th singular vector computed with a different method<sup id="fnref-3" class="footnote-ref"><a href="#fn-3">3</a></sup>.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Finally, let us compare the performance of different approaches.
+In the plot below we compare the runtime for a variety matrix sizes for different approaches:</p>
+<ul>
+<li>"cpu" is the randomized algorithm implemented above run on CPU</li>
+<li>"gpu" is the randomized algorithm implemented above run on GPU</li>
+<li>"full" is the standard SVD included in pytorch run on CPU</li>
+<li>"scipy" is the truncated SVD <code>scipy.sparse.svds</code></li>
+</ul>
+<p>All runtimes were measured on a Colab GPU instance with a Nvidia T4 and 2 CPU cores.
+You may need to zoom out to see the times for "full" and very large matrix sizes.</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<details class="description">
+      <summary class="btn btn-sm" data-open="Hide Code" data-close="Show Code"></summary>
+        <p><div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">matrix_sizes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="o">**</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">9</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">10</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">11</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">12</span><span class="p">]</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+<span class="n">results</span><span class="p">[</span><span class="s1">&#39;sizes&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">matrix_sizes</span>
+<span class="n">n_components</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">matrix_sizes</span><span class="p">:</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">sample_lowrank_matrix</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">time</span> <span class="o">=</span> <span class="o">%</span><span class="k">timeit</span> -o -q randomized_svd(M, n_components=n_components)
+    <span class="n">results</span><span class="p">[</span><span class="s1">&#39;cpu&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">best</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">matrix_sizes</span><span class="p">:</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">sample_lowrank_matrix</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">time</span> <span class="o">=</span> <span class="o">%</span><span class="k">timeit</span> -q -o torch.svd(M)
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;full&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">best</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">matrix_sizes</span><span class="p">:</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">sample_lowrank_matrix</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">time</span> <span class="o">=</span> <span class="o">%</span><span class="k">timeit</span> -q -o svds(M, k=n_components)
+    <span class="n">results</span><span class="p">[</span><span class="s2">&quot;scipy&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">best</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="n">matrix_sizes</span><span class="p">:</span>
+        <span class="n">M</span> <span class="o">=</span> <span class="n">sample_lowrank_matrix</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="o">%</span><span class="k">timeit</span> -q -o randomized_svd(M.cuda(), n_components=n_components)
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;gpu&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">best</span><span class="p">)</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="o">**</span><span class="n">results</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">:</span> <span class="n">n_components</span><span class="p">})</span>
+<span class="n">value_vars</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;sizes&quot;</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">},</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">melt</span><span class="p">(</span><span class="n">id_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;sizes&quot;</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">],</span> <span class="n">value_vars</span><span class="o">=</span><span class="n">value_vars</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;runtime&quot;</span><span class="p">,</span> <span class="s2">&quot;variable&quot;</span><span class="p">:</span> <span class="s2">&quot;algorithm&quot;</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="p">(</span>
+    <span class="n">alt</span><span class="o">.</span><span class="n">Chart</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">mark_point</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">40</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">encode</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">X</span><span class="p">(</span><span class="s2">&quot;sizes&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Scale</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;sqrt&#39;</span><span class="p">,</span> <span class="n">zero</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Matrix Size&quot;</span><span class="p">)),</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Y</span><span class="p">(</span><span class="s2">&quot;runtime&quot;</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Scale</span><span class="p">(</span><span class="n">domain</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="n">alt</span><span class="o">.</span><span class="n">Axis</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Runtime [s]&quot;</span><span class="p">)),</span>
+        <span class="n">color</span><span class="o">=</span><span class="s2">&quot;algorithm&quot;</span><span class="p">,</span> 
+        <span class="n">shape</span><span class="o">=</span><span class="s2">&quot;algorithm&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+</p>
+    </details>
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+
+<div class="output_html rendered_html output_subarea output_execute_result">
+
+<div id="altair-viz-cd30a2fdc401461d92cd9c916cffff4b"></div>
+<script type="text/javascript">
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    if (outputDiv.id !== "altair-viz-cd30a2fdc401461d92cd9c916cffff4b") {
+      outputDiv = document.getElementById("altair-viz-cd30a2fdc401461d92cd9c916cffff4b");
+    }
+    const paths = {
+      "vega": "https://cdn.jsdelivr.net/npm//vega@5?noext",
+      "vega-lib": "https://cdn.jsdelivr.net/npm//vega-lib?noext",
+      "vega-lite": "https://cdn.jsdelivr.net/npm//vega-lite@4.8.1?noext",
+      "vega-embed": "https://cdn.jsdelivr.net/npm//vega-embed@6?noext",
+    };
+
+    function loadScript(lib) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = paths[lib];
+        s.async = true;
+        s.onload = () => resolve(paths[lib]);
+        s.onerror = () => reject(`Error loading script: ${paths[lib]}`);
+        document.getElementsByTagName("head")[0].appendChild(s);
+      });
+    }
+
+    function showError(err) {
+      outputDiv.innerHTML = `<div class="error" style="color:red;">${err}</div>`;
+      throw err;
+    }
+
+    function displayChart(vegaEmbed) {
+      vegaEmbed(outputDiv, spec, embedOpt)
+        .catch(err => showError(`Javascript Error: ${err.message}<br>This usually means there's a typo in your chart specification. See the javascript console for the full traceback.`));
+    }
+
+    if(typeof define === "function" && define.amd) {
+      requirejs.config({paths});
+      require(["vega-embed"], displayChart, err => showError(`Error loading script: ${err.message}`));
+    } else if (typeof vegaEmbed === "function") {
+      displayChart(vegaEmbed);
+    } else {
+      loadScript("vega")
+        .then(() => loadScript("vega-lite"))
+        .then(() => loadScript("vega-embed"))
+        .catch(showError)
+        .then(() => displayChart(vegaEmbed));
+    }
+  })({"config": {"view": {"continuousWidth": 400, "continuousHeight": 300}}, "data": {"name": "data-b16ddc41a462151eb779a6063e4edbd8"}, "mark": {"type": "point", "size": 40}, "encoding": {"color": {"type": "nominal", "field": "algorithm"}, "shape": {"type": "nominal", "field": "algorithm"}, "x": {"type": "quantitative", "axis": {"title": "Matrix Size"}, "field": "sizes", "scale": {"type": "sqrt", "zero": false}}, "y": {"type": "quantitative", "axis": {"title": "Runtime [s]"}, "field": "runtime", "scale": {"domain": [0, 0.55]}}}, "selection": {"selector006": {"type": "interval", "bind": "scales", "encodings": ["x", "y"]}}, "$schema": "https://vega.github.io/schema/vega-lite/v4.8.1.json", "datasets": {"data-b16ddc41a462151eb779a6063e4edbd8": [{"sizes": 256, "k": 2, "algorithm": "cpu", "runtime": 0.0009004425000000001}, {"sizes": 512, "k": 2, "algorithm": "cpu", "runtime": 0.0031492776}, {"sizes": 1024, "k": 2, "algorithm": "cpu", "runtime": 0.0146373566}, {"sizes": 2048, "k": 2, "algorithm": "cpu", "runtime": 0.0658793121}, {"sizes": 4096, "k": 2, "algorithm": "cpu", "runtime": 0.399800227}, {"sizes": 256, "k": 2, "algorithm": "full", "runtime": 0.0045911459}, {"sizes": 512, "k": 2, "algorithm": "full", "runtime": 0.0276984882}, {"sizes": 1024, "k": 2, "algorithm": "full", "runtime": 0.270168177}, {"sizes": 2048, "k": 2, "algorithm": "full", "runtime": 2.034404582}, {"sizes": 4096, "k": 2, "algorithm": "full", "runtime": 19.843143551}, {"sizes": 256, "k": 2, "algorithm": "scipy", "runtime": 0.0015926768}, {"sizes": 512, "k": 2, "algorithm": "scipy", "runtime": 0.0041728461000000005}, {"sizes": 1024, "k": 2, "algorithm": "scipy", "runtime": 0.0122488926}, {"sizes": 2048, "k": 2, "algorithm": "scipy", "runtime": 0.0462795591}, {"sizes": 4096, "k": 2, "algorithm": "scipy", "runtime": 0.242916766}, {"sizes": 256, "k": 2, "algorithm": "gpu", "runtime": 0.005793116}, {"sizes": 512, "k": 2, "algorithm": "gpu", "runtime": 0.0062681712}, {"sizes": 1024, "k": 2, "algorithm": "gpu", "runtime": 0.0071049892}, {"sizes": 2048, "k": 2, "algorithm": "gpu", "runtime": 0.0106654899}, {"sizes": 4096, "k": 2, "algorithm": "gpu", "runtime": 0.0279226877}]}}, {"mode": "vega-lite"});
+</script>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note that for all truncated SVDs, we set $k=2$, that is we only computed the two largest singular values.
+Naturally, for larger values of $k$ the difference between the full SVD and the truncated versions would become smaller.</p>
+<p>We clearly save a lot of time simply by using an algorithm that only computes the necessary singular values and vectors.
+For the largest matrix size, we see a speedup of over 50x between the full SVD and our simple implementation run on CPU.
+When we compare the slowest version to the randomized truncated SVD run on GPU, we see an even larger speedup of over 400x.</p>
+<h2 id="Conclusion">Conclusion<a class="anchor-link" href="#Conclusion"> </a></h2><p>I hope this blog post could convey why I consider the randomized truncated SVD as my favorite algorithm.
+It solves a very common and important problem, it's fast, it easily runs on GPUs, and it's simple enough to explain in a few minutes.
+But the most important factor is the insight it provides into the power of probabilistic algorithms in general:
+If we give up the requirement that an algorithm should work 100% of the time in theory, we have a lot to gain in simplicity and performance.
+And as long as failure is unlikely enough, it will not make a difference in practice.
+So stop worrying and start loving the possibility of failure.</p>
+<p><div class="footnotes"><p id="fn-1">1. N. Halko, P.-G. Martinsson, and J. A. Tropp, “Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions,” arXiv:0909.4061 [math], Dec. 2010.<a href="#fnref-1" class="footnote footnotes">↩</a></p></div>
+<div class="footnotes"><p id="fn-2">2. One way to show this is to plug in the identity matrix for $M$.<a href="#fnref-2" class="footnote footnotes">↩</a></p></div>
+<div class="footnotes"><p id="fn-3">3. In this situation, the singular values are called degenerate. This is an extreme case of singular values not being “distinguishable enough”.<a href="#fnref-3" class="footnote footnotes">↩</a></p></div></p>
+
+</div>
+</div>
+</div>
+</div>
+
+
+
+  </div><a class="u-url" href="/blog/2021-06-10-truncated-svd/" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/dsuess" title="dsuess"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://www.linkedin.com/in/daniel-suess" title="daniel-suess"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#linkedin"></use></svg></a></li><li><a rel="me" href="https://twitter.com/suess_daniel" title="suess_daniel"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
