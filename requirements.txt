@@ -1,0 +1,5 @@
+jupyter
+notebook
+jupyter_contrib_nbextensions
+altair
+numpy
