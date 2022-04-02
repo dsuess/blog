@@ -8,7 +8,8 @@ My name is Daniel Suess and I am interested in many things machine learning, pro
 
 ## my history
 
-- **2021 --** Machine Learning Engineer @ [Max Kelsen](https://maxkelsen.com/)
+- **2021 --** Data Scientist -- Model R&D @ [Nearmap](https://nearmap.com/)
+- **2021** Machine Learning Engineer @ [Max Kelsen](https://maxkelsen.com/)
 - **2018 -- 2021** Machine Learning Engineer @ [Silverpond](http://silverpond.com.au)
 - **2015 -- 2018** Doctoral Candidate (continuation) in the [group of D. Gross](http://www.thp.uni-koeln.de/gross/) @ University of Cologne. Thesis: _Due to, or in spite of? The effect of constraints on efficiency in quantum estimation problems._ [[pdf]](https://kups.ub.uni-koeln.de/9012/1/thesis.pdf) [[git]](https://github.com/dsuess/thesis)
 - **2017** Visiting researcher in the [group of S. Flammia and S. Bartlett](http://sydney.edu.au/science/physics/research/quantum/) @ University of Sydney
